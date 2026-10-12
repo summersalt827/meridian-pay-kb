@@ -3,6 +3,12 @@
 腾讯云 AI CAN DO IT Hackathon 2026 · FinTech 赛道（Aspire 出题）
 **Enterprise Agent Builder & Autonomous Operations Platform** — 演示场景 ② Internal Knowledge Brain
 
+## 界面
+
+![多跳 agent 查询规划](docs/demo-agent.png)
+
+![账户情报简报](docs/demo-brief.png)
+
 ## 是什么
 
 一个参数化 Agent 工作流平台：同一套「规划 → 多子问题检索(各自过 RBAC) → 合并 → 合成」多跳骨架，

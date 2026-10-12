@@ -6,22 +6,25 @@
 <title>Meridian Pay · 知识库问答</title>
 <style>
   :root {
-    --blue: #2563EB;
-    --blue-dark: #1D4ED8;
-    --blue-soft: #EFF6FF;
-    --ink: #0F172A;
-    --muted: #64748B;
-    --line: #E2E8F0;
-    --bg: #F7F8FA;
+    --brand1: #7C3AED;
+    --brand2: #DB2777;
+    --grad: linear-gradient(135deg, #7C3AED 0%, #9D3FC7 45%, #DB2777 100%);
+    --blue: #7C3AED;
+    --blue-dark: #6D28D9;
+    --blue-soft: #F5F3FF;
+    --ink: #1E1B2E;
+    --muted: #6B7280;
+    --line: #E8E4F4;
+    --bg: #F7F6FB;
     --orange: #EA580C;
     --orange-soft: #FFF7ED;
     --green: #059669;
     --green-soft: #ECFDF5;
     --purple: #7C3AED;
     --purple-soft: #F5F3FF;
-    --gray-soft: #F1F5F9;
+    --gray-soft: #F3F1FA;
     --radius: 12px;
-    --shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px rgba(15, 23, 42, .06);
+    --shadow: 0 1px 2px rgba(30, 27, 46, .05), 0 8px 24px rgba(124, 58, 237, .08);
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
@@ -50,10 +53,10 @@
   .brand { display: flex; align-items: center; gap: 10px; }
   .logo {
     width: 32px; height: 32px; border-radius: 8px;
-    background: linear-gradient(135deg, var(--blue), #60A5FA);
+    background: var(--grad);
     color: #fff; font-weight: 700; font-size: 15px;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 2px 6px rgba(37, 99, 235, .28);
+    box-shadow: 0 2px 8px rgba(124, 58, 237, .35);
   }
   .brand-text h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: .2px; }
   .brand-text p  { margin: 0; font-size: 12px; color: var(--muted); }
@@ -106,9 +109,41 @@
   }
   .thread { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
 
-  .empty { text-align: center; padding: 56px 16px; color: var(--muted); }
+  .empty { text-align: center; padding: 28px 16px 8px; color: var(--muted); }
   .empty h2 { margin: 0 0 6px; font-size: 19px; color: var(--ink); font-weight: 600; }
   .empty p  { margin: 0 0 18px; font-size: 13px; }
+
+  /* hero: 渐变欢迎区 (Aspire 紫红) */
+  .hero {
+    background: var(--grad);
+    border-radius: 20px;
+    padding: 42px 28px 30px;
+    color: #fff;
+    margin: 0 auto 24px;
+    max-width: 720px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 16px 44px rgba(124, 58, 237, .3);
+  }
+  .hero::after {
+    content: ''; position: absolute; right: -70px; top: -70px;
+    width: 220px; height: 220px; border-radius: 50%;
+    background: rgba(255, 255, 255, .12);
+  }
+  .hero h2 { color: #fff; font-size: 25px; margin: 0 0 8px; letter-spacing: .5px; }
+  .hero-sub { color: rgba(255, 255, 255, .92); margin: 0 0 18px; font-size: 13.5px; }
+  .hero-feats { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 0 0 24px; }
+  .feat {
+    background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .3);
+    border-radius: 999px; padding: 6px 15px; font-size: 13px; font-weight: 500;
+    backdrop-filter: blur(4px);
+  }
+  .feat b { font-weight: 700; margin-right: 2px; }
+  .hero .seg { background: rgba(255, 255, 255, .16); border-color: rgba(255, 255, 255, .32); }
+  .hero .seg button { color: rgba(255, 255, 255, .85); }
+  .hero .seg button:hover { color: #fff; }
+  .hero .seg button.active { background: #fff; color: var(--brand1); box-shadow: 0 2px 10px rgba(0, 0, 0, .18); }
+  .hero .seg-hint { color: rgba(255, 255, 255, .78); }
 
   /* 工作流分段选择器 */
   .seg-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 14px; }
@@ -157,7 +192,12 @@
   }
   .row.bot .bubble {
     background: #fff; color: var(--ink); border: 1px solid var(--line);
-    border-top-left-radius: 4px;
+    border-top-left-radius: 4px; position: relative;
+  }
+  .row.bot .bubble::before {
+    content: ''; position: absolute; left: 0; top: 12px; bottom: 12px;
+    width: 3px; border-radius: 2px;
+    background: linear-gradient(180deg, var(--brand1), var(--brand2));
   }
   .row.error .bubble {
     background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA;
@@ -172,18 +212,37 @@
   .dots i:nth-child(3) { animation-delay: .36s; }
   @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
 
-  /* ---------- 思考过程 (子问题拆解) ---------- */
+  /* ---------- 思考过程 (子问题拆解, 思维链) ---------- */
   .plan {
-    background: var(--gray-soft); border: 1px solid var(--line);
-    border-radius: 8px; padding: 8px 10px; margin-bottom: 10px;
+    background: #FBFAFF; border: 1px solid #EDE9FE;
+    border-radius: 10px; padding: 10px 12px; margin-bottom: 10px;
   }
   .plan-title {
-    font-size: 11px; font-weight: 600; color: var(--ink);
-    letter-spacing: .2px; margin-bottom: 3px;
+    font-size: 11px; font-weight: 600; color: var(--brand1);
+    letter-spacing: .3px; margin-bottom: 6px;
   }
   .plan-list { margin: 0; padding: 0; list-style: none; }
-  .plan-list li { font-size: 12px; color: var(--muted); padding: 1px 0; }
-  .plan-list .num { color: var(--blue); font-weight: 600; margin-right: 4px; }
+  .plan-list li {
+    position: relative; padding: 0 0 7px 30px;
+    font-size: 12px; color: var(--muted);
+  }
+  .plan-list li:last-child { padding-bottom: 2px; }
+  .plan-list li::before {
+    content: ''; position: absolute; left: 10px; top: 24px; bottom: 0;
+    width: 2px; background: #E5DEFC;
+  }
+  .plan-list li:last-child::before { display: none; }
+  .plan-list .num {
+    position: absolute; left: 0; top: 0;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--grad); color: #fff;
+    font-size: 11px; font-weight: 600;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .plan-list li.plan-synth {
+    padding: 0 0 0 30px; font-weight: 600; font-size: 11.5px; color: var(--brand1);
+  }
+  .plan-list li.plan-synth::before { display: block; }
 
   /* ---------- 模式标签与来源 ---------- */
   .meta { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; flex-wrap: wrap; }
@@ -196,11 +255,15 @@
   .tag.no_context { background: var(--gray-soft);   color: var(--muted);  border: 1px solid var(--line); }
   .obs { font-size: 11px; color: #94A3B8; margin-bottom: 8px; }
 
-  .sources { border-top: 1px dashed var(--line); padding-top: 8px; }
+  .sources {
+    border-top: 1px dashed var(--line); padding-top: 10px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
   .sources-title { font-size: 11px; color: var(--muted); margin-bottom: 5px; }
   .src {
     display: flex; align-items: baseline; gap: 8px;
-    font-size: 12px; padding: 3px 0;
+    font-size: 12px; padding: 6px 10px;
+    background: #FAF9FE; border: 1px solid #EDE9FE; border-radius: 8px;
   }
   .src .idx { color: #94A3B8; flex: 0 0 18px; }
   .src .ref { flex: 1 1 auto; min-width: 0; }
@@ -248,11 +311,12 @@
   .composer textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37, 99, 235, .12); }
   .send {
     flex: 0 0 auto; height: 42px; padding: 0 22px;
-    background: var(--blue); color: #fff; border: none; border-radius: var(--radius);
+    background: var(--grad); color: #fff; border: none; border-radius: var(--radius);
     font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
-    transition: background .15s, opacity .15s;
+    box-shadow: 0 4px 14px rgba(124, 58, 237, .3);
+    transition: filter .15s, opacity .15s;
   }
-  .send:hover:not(:disabled) { background: var(--blue-dark); }
+  .send:hover:not(:disabled) { filter: brightness(1.08); }
   .send:disabled { opacity: .5; cursor: not-allowed; }
   .tip { max-width: 880px; margin: 8px auto 0; font-size: 11px; color: #94A3B8; text-align: right; }
   .seg-foot { max-width: 880px; margin: 0 auto 8px; display: flex; align-items: center; gap: 10px; }
@@ -354,15 +418,21 @@
 <main id="main">
   <div class="thread" id="thread">
     <div class="empty" id="empty">
-      <h2>欢迎使用 Meridian Pay 知识大脑</h2>
-      <p>Meridian Pay 内部知识库 · 产品 / 合规 / 销售知识按角色分级开放，回答附带来源引用与权限判定。</p>
-
-      <div class="seg-wrap">
-        <div class="seg" id="seg">
-          <button type="button" class="seg-btn active" data-wf="knowledge_qa">知识问答</button>
-          <button type="button" class="seg-btn" data-wf="gtm_research">账户情报</button>
+      <div class="hero">
+        <h2>企业知识大脑 · 多跳 Agent 驱动</h2>
+        <p class="hero-sub">Meridian Pay 内部知识库 · 产品 / 合规 / 销售知识按角色分级开放<br>回答附带来源引用 · 权限判定 · 审计留痕</p>
+        <div class="hero-feats">
+          <span class="feat"><b>✦</b> 多跳 Agent</span>
+          <span class="feat"><b>✦</b> 角色权限 RBAC</span>
+          <span class="feat"><b>✦</b> 审计留痕</span>
         </div>
-        <span class="seg-hint" id="segHint">通用知识问答：多跳检索 + 来源引用</span>
+        <div class="seg-wrap">
+          <div class="seg" id="seg">
+            <button type="button" class="seg-btn active" data-wf="knowledge_qa">知识问答</button>
+            <button type="button" class="seg-btn" data-wf="gtm_research">账户情报</button>
+          </div>
+          <span class="seg-hint" id="segHint">通用知识问答：多跳检索 + 来源引用</span>
+        </div>
       </div>
 
       <div class="chips" id="chips"></div>
@@ -590,9 +660,13 @@
       ol.className = "plan-list";
       subs.forEach(function (q, i) {
         var li = document.createElement("li");
-        li.innerHTML = '<span class="num">' + circled(i + 1) + "</span>" + esc(q);
+        li.innerHTML = '<span class="num">' + (i + 1) + "</span>" + esc(q);
         ol.appendChild(li);
       });
+      var synth = document.createElement("li");
+      synth.className = "plan-synth";
+      synth.textContent = "↳ 合并来源 · 合成带引用回答";
+      ol.appendChild(synth);
       plan.appendChild(ol);
       r.bubble.appendChild(plan);
     }
