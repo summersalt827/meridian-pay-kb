@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.db
+*.bak
+web_server.log
+.DS_Store

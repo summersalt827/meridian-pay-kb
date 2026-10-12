@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meridian Pay · 知识库问答</title>
+<style>
+  :root {
+    --blue: #2563EB;
+    --blue-dark: #1D4ED8;
+    --blue-soft: #EFF6FF;
+    --ink: #0F172A;
+    --muted: #64748B;
+    --line: #E2E8F0;
+    --bg: #F7F8FA;
+    --orange: #EA580C;
+    --orange-soft: #FFF7ED;
+    --green: #059669;
+    --green-soft: #ECFDF5;
+    --purple: #7C3AED;
+    --purple-soft: #F5F3FF;
+    --gray-soft: #F1F5F9;
+    --radius: 12px;
+    --shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px rgba(15, 23, 42, .06);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.6;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- 顶部栏 ---------- */
+  header {
+    flex: 0 0 auto;
+    background: #fff;
+    border-bottom: 1px solid var(--line);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .logo {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--blue), #60A5FA);
+    color: #fff; font-weight: 700; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 6px rgba(37, 99, 235, .28);
+  }
+  .brand-text h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: .2px; }
+  .brand-text p  { margin: 0; font-size: 12px; color: var(--muted); }
+  .badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .badge-ok {
+    font-size: 11px; font-weight: 600; color: var(--green);
+    background: var(--green-soft); border: 1px solid #A7F3D0;
+    border-radius: 999px; padding: 3px 10px; white-space: nowrap;
+  }
+
+  .identity {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .field { display: flex; align-items: center; gap: 6px; }
+  .field label { font-size: 12px; color: var(--muted); }
+  .field input, .field select {
+    font: inherit; font-size: 13px; color: var(--ink);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 6px 10px; background: #fff; outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .field input { width: 120px; }
+  .field input:focus, .field select:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+  }
+  .role-hint { font-size: 12px; color: var(--muted); }
+  .health {
+    font-size: 12px; color: var(--muted);
+    background: var(--gray-soft); border: 1px solid var(--line);
+    border-radius: 999px; padding: 4px 12px; white-space: nowrap;
+  }
+  .health b { color: var(--blue); font-weight: 600; }
+
+  .audit-btn {
+    font: inherit; font-size: 13px; font-weight: 600;
+    color: var(--blue); background: var(--blue-soft);
+    border: 1px solid #BFDBFE; border-radius: 8px;
+    padding: 6px 14px; cursor: pointer; white-space: nowrap;
+    transition: background .15s, border-color .15s;
+  }
+  .audit-btn:hover { background: #DBEAFE; border-color: var(--blue); }
+  .audit-btn[hidden] { display: none; }
+
+  /* ---------- 消息区 ---------- */
+  main {
+    flex: 1 1 auto; overflow-y: auto;
+    padding: 24px 16px 8px;
+  }
+  .thread { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+  .empty { text-align: center; padding: 56px 16px; color: var(--muted); }
+  .empty h2 { margin: 0 0 6px; font-size: 19px; color: var(--ink); font-weight: 600; }
+  .empty p  { margin: 0 0 18px; font-size: 13px; }
+
+  /* 工作流分段选择器 */
+  .seg-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .seg {
+    display: inline-flex; gap: 2px; padding: 3px;
+    background: var(--gray-soft); border: 1px solid var(--line); border-radius: 999px;
+  }
+  .seg button {
+    font: inherit; font-size: 13px; color: var(--muted);
+    background: none; border: none; border-radius: 999px;
+    padding: 5px 16px; cursor: pointer; transition: all .15s;
+  }
+  .seg button:hover { color: var(--blue); }
+  .seg button.active {
+    background: #fff; color: var(--blue); font-weight: 600;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .08);
+  }
+  .seg-hint { font-size: 12px; color: #94A3B8; }
+
+  .chips { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .chip {
+    border: 1px solid var(--line); background: #fff; color: var(--ink);
+    border-radius: 999px; padding: 7px 14px; font-size: 13px; cursor: pointer;
+    transition: all .15s; text-align: left;
+  }
+  .chip:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-soft); }
+  .chip.long { max-width: 620px; border-radius: 12px; line-height: 1.5; }
+  .chip-hint { margin: 16px 0 0; font-size: 12px; color: #94A3B8; }
+
+  .row { display: flex; gap: 10px; align-items: flex-start; }
+  .row.user { flex-direction: row-reverse; }
+  .avatar {
+    flex: 0 0 28px; width: 28px; height: 28px; border-radius: 8px;
+    font-size: 12px; font-weight: 600; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .avatar.bot  { background: var(--blue); }
+  .avatar.me   { background: #94A3B8; }
+  .bubble {
+    max-width: 78%; padding: 12px 14px; border-radius: var(--radius);
+    box-shadow: var(--shadow); white-space: pre-wrap; word-break: break-word;
+  }
+  .row.user .bubble {
+    background: var(--blue); color: #fff;
+    border-top-right-radius: 4px;
+  }
+  .row.bot .bubble {
+    background: #fff; color: var(--ink); border: 1px solid var(--line);
+    border-top-left-radius: 4px;
+  }
+  .row.error .bubble {
+    background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA;
+  }
+  .thinking { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+  .dots { display: inline-flex; gap: 4px; }
+  .dots i {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--blue);
+    animation: blink 1.2s infinite ease-in-out;
+  }
+  .dots i:nth-child(2) { animation-delay: .18s; }
+  .dots i:nth-child(3) { animation-delay: .36s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+
+  /* ---------- 思考过程 (子问题拆解) ---------- */
+  .plan {
+    background: var(--gray-soft); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 10px; margin-bottom: 10px;
+  }
+  .plan-title {
+    font-size: 11px; font-weight: 600; color: var(--ink);
+    letter-spacing: .2px; margin-bottom: 3px;
+  }
+  .plan-list { margin: 0; padding: 0; list-style: none; }
+  .plan-list li { font-size: 12px; color: var(--muted); padding: 1px 0; }
+  .plan-list .num { color: var(--blue); font-weight: 600; margin-right: 4px; }
+
+  /* ---------- 模式标签与来源 ---------- */
+  .meta { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; flex-wrap: wrap; }
+  .tag {
+    font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+    letter-spacing: .3px;
+  }
+  .tag.llm        { background: var(--blue-soft);   color: var(--blue);   border: 1px solid #BFDBFE; }
+  .tag.extractive { background: var(--orange-soft); color: var(--orange); border: 1px solid #FED7AA; }
+  .tag.no_context { background: var(--gray-soft);   color: var(--muted);  border: 1px solid var(--line); }
+  .obs { font-size: 11px; color: #94A3B8; margin-bottom: 8px; }
+
+  .sources { border-top: 1px dashed var(--line); padding-top: 8px; }
+  .sources-title { font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+  .src {
+    display: flex; align-items: baseline; gap: 8px;
+    font-size: 12px; padding: 3px 0;
+  }
+  .src .idx { color: #94A3B8; flex: 0 0 18px; }
+  .src .ref { flex: 1 1 auto; min-width: 0; }
+  .src .path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--blue); }
+  .src .title { color: var(--muted); }
+  .src .score {
+    flex: 0 0 auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px; color: var(--muted);
+    background: var(--gray-soft); border-radius: 4px; padding: 1px 6px;
+  }
+  .src-empty { font-size: 12px; color: var(--muted); }
+
+  /* 来源平台徽章 (Confluence 蓝 / Drive 绿 / Jira 橙) */
+  .plat {
+    display: inline-block; font-size: 10.5px; font-weight: 600;
+    padding: 1px 6px; border-radius: 4px; margin-right: 5px;
+    border: 1px solid var(--line); background: var(--gray-soft); color: var(--muted);
+    vertical-align: 1px;
+  }
+  .plat.Confluence { background: var(--blue-soft);   color: var(--blue);   border-color: #BFDBFE; }
+  .plat.Drive      { background: var(--green-soft);  color: var(--green);  border-color: #A7F3D0; }
+  .plat.Jira       { background: var(--orange-soft); color: var(--orange); border-color: #FED7AA; }
+
+  /* 下载简报按钮 */
+  .dl-btn {
+    margin-top: 10px; font: inherit; font-size: 12px; font-weight: 600;
+    color: var(--blue); background: var(--blue-soft);
+    border: 1px solid #BFDBFE; border-radius: 8px; padding: 5px 12px; cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  .dl-btn:hover { background: #DBEAFE; border-color: var(--blue); }
+
+  /* ---------- 输入区 ---------- */
+  footer {
+    flex: 0 0 auto; background: #fff; border-top: 1px solid var(--line);
+    padding: 14px 16px 18px;
+  }
+  .composer { max-width: 880px; margin: 0 auto; display: flex; gap: 10px; align-items: flex-end; }
+  .composer textarea {
+    flex: 1 1 auto; resize: none; font: inherit; font-size: 14px; color: var(--ink);
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 11px 14px; max-height: 160px; outline: none; background: #fff;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .composer textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37, 99, 235, .12); }
+  .send {
+    flex: 0 0 auto; height: 42px; padding: 0 22px;
+    background: var(--blue); color: #fff; border: none; border-radius: var(--radius);
+    font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: background .15s, opacity .15s;
+  }
+  .send:hover:not(:disabled) { background: var(--blue-dark); }
+  .send:disabled { opacity: .5; cursor: not-allowed; }
+  .tip { max-width: 880px; margin: 8px auto 0; font-size: 11px; color: #94A3B8; text-align: right; }
+  .seg-foot { max-width: 880px; margin: 0 auto 8px; display: flex; align-items: center; gap: 10px; }
+  .seg-foot .seg-hint { font-size: 11px; color: #94A3B8; }
+
+  /* ---------- 审计日志抽屉 ---------- */
+  .mask {
+    position: fixed; inset: 0; background: rgba(15, 23, 42, .38);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px; z-index: 50;
+  }
+  .mask[hidden] { display: none; }
+  .drawer {
+    background: #fff; border-radius: var(--radius); box-shadow: 0 24px 64px rgba(15, 23, 42, .22);
+    width: min(920px, 100%); max-height: 82vh; display: flex; flex-direction: column;
+    overflow: hidden; animation: pop .16s ease-out;
+  }
+  @keyframes pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .drawer-head {
+    display: flex; align-items: center; gap: 12px;
+    padding: 16px 20px; border-bottom: 1px solid var(--line);
+  }
+  .drawer-head h3 { margin: 0; font-size: 15px; font-weight: 650; }
+  .drawer-head .sub { font-size: 12px; color: var(--muted); }
+  .drawer-head .acts { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .ghost-btn {
+    font: inherit; font-size: 13px; color: var(--ink); background: #fff;
+    border: 1px solid var(--line); border-radius: 8px; padding: 5px 12px; cursor: pointer;
+    transition: all .15s;
+  }
+  .ghost-btn:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-soft); }
+  .close-btn {
+    font: inherit; font-size: 18px; line-height: 1; color: var(--muted);
+    background: none; border: none; cursor: pointer; padding: 4px 8px; border-radius: 6px;
+  }
+  .close-btn:hover { color: var(--ink); background: var(--gray-soft); }
+
+  .drawer-body { overflow: auto; padding: 0 20px 16px; }
+  table.audit { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.audit th {
+    position: sticky; top: 0; z-index: 1;
+    background: var(--gray-soft); color: var(--muted); font-weight: 600;
+    text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  table.audit td {
+    padding: 9px 10px; border-bottom: 1px solid #F1F5F9; vertical-align: top;
+  }
+  table.audit tr:hover td { background: #FAFBFC; }
+  td.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); white-space: nowrap; }
+  td.q { max-width: 260px; }
+  .pill {
+    font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--gray-soft); color: var(--muted);
+    white-space: nowrap;
+  }
+  .pill.admin { background: var(--blue-soft); color: var(--blue); border-color: #BFDBFE; }
+  .pill.sales { background: var(--orange-soft); color: var(--orange); border-color: #FED7AA; }
+  .pill.wf-gtm { background: var(--purple-soft); color: var(--purple); border-color: #DDD6FE; }
+  .empty-row { text-align: center; color: var(--muted); padding: 32px 0; }
+  .err-row { text-align: center; color: #B91C1C; padding: 24px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">MP</div>
+    <div class="brand-text">
+      <h1>Meridian Pay 知识大脑</h1>
+      <p>SME 商务卡 · 跨境付款 · 多币种钱包</p>
+    </div>
+  </div>
+
+  <div class="badges">
+    <span class="badge-ok">L1–L3 数据分级已生效</span>
+    <span class="badge-ok">MAS 审计留痕开启</span>
+  </div>
+
+  <div class="identity">
+    <div class="field">
+      <label for="username">用户名</label>
+      <input id="username" type="text" value="admin" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="role">角色</label>
+      <select id="role">
+        <option value="admin" selected>admin</option>
+        <option value="sales">sales</option>
+        <option value="viewer">viewer</option>
+      </select>
+    </div>
+    <span class="role-hint" id="roleHint">admin 可检索全部目录</span>
+    <button class="audit-btn" id="auditBtn" hidden>审计日志</button>
+    <span class="health" id="health">索引加载中…</span>
+  </div>
+</header>
+
+<main id="main">
+  <div class="thread" id="thread">
+    <div class="empty" id="empty">
+      <h2>欢迎使用 Meridian Pay 知识大脑</h2>
+      <p>Meridian Pay 内部知识库 · 产品 / 合规 / 销售知识按角色分级开放，回答附带来源引用与权限判定。</p>
+
+      <div class="seg-wrap">
+        <div class="seg" id="seg">
+          <button type="button" class="seg-btn active" data-wf="knowledge_qa">知识问答</button>
+          <button type="button" class="seg-btn" data-wf="gtm_research">账户情报</button>
+        </div>
+        <span class="seg-hint" id="segHint">通用知识问答：多跳检索 + 来源引用</span>
+      </div>
+
+      <div class="chips" id="chips"></div>
+      <p class="chip-hint" id="chipHint"></p>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <!-- 工作流选择器在对话开始后仍可用 (与欢迎区那一份共享状态) -->
+  <div class="seg-foot" id="segFoot"></div>
+  <div class="chips chips-foot" id="chipsFoot" hidden></div>
+  <div class="composer">
+    <textarea id="input" rows="1" placeholder="输入问题，Enter 发送，Shift + Enter 换行"></textarea>
+    <button class="send" id="send">发送</button>
+  </div>
+  <div class="tip">viewer 仅 <code>public/</code>；sales 增开 <code>gtm/</code>；admin 不限。越权文档会被 RBAC 拦截</div>
+</footer>
+
+<!-- 审计日志抽屉: 仅 admin 可见入口, 数据来自 /api/audit -->
+<div class="mask" id="mask" hidden>
+  <div class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="审计日志">
+    <div class="drawer-head">
+      <h3>审计日志</h3>
+      <span class="sub" id="auditSub">最近 20 条问答记录</span>
+      <div class="acts">
+        <button class="ghost-btn" id="refreshBtn">刷新</button>
+        <button class="close-btn" id="closeBtn" aria-label="关闭">×</button>
+      </div>
+    </div>
+    <div class="drawer-body">
+      <table class="audit">
+        <thead>
+          <tr>
+            <th>时间</th>
+            <th>用户</th>
+            <th>角色</th>
+            <th>问题</th>
+            <th>来源数</th>
+            <th>回答模式</th>
+          </tr>
+        </thead>
+        <tbody id="auditBody">
+          <tr><td class="empty-row" colspan="6">加载中…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var thread     = document.getElementById("thread");
+  var mainEl     = document.getElementById("main");
+  var emptyEl    = document.getElementById("empty");
+  var inputEl    = document.getElementById("input");
+  var sendBtn    = document.getElementById("send");
+  var userEl     = document.getElementById("username");
+  var roleEl     = document.getElementById("role");
+  var hintEl     = document.getElementById("roleHint");
+  var healthEl   = document.getElementById("health");
+  var auditBtn   = document.getElementById("auditBtn");
+  var maskEl     = document.getElementById("mask");
+  var drawerEl   = document.getElementById("drawer");
+  var auditBody  = document.getElementById("auditBody");
+  var auditSub   = document.getElementById("auditSub");
+  var refreshBtn = document.getElementById("refreshBtn");
+  var closeBtn   = document.getElementById("closeBtn");
+  var segEl      = document.getElementById("seg");
+  var segFootEl  = document.getElementById("segFoot");
+  var chipsEl    = document.getElementById("chips");
+  var chipsFootEl = document.getElementById("chipsFoot");
+  var chipHintEl = document.getElementById("chipHint");
+
+  var AUDIT_LIMIT = 20;
+  var busy = false;
+
+  // ---------- 工作流与示例问题 ----------
+  var WORKFLOWS = {
+    knowledge_qa: {
+      hint: "通用知识问答：多跳检索 + 来源引用",
+      chips: [
+        "报销流程是什么？",
+        "我们的产品线有哪些？",
+        "薪酬带宽是多少？",
+        "资金账户结算流程是什么？",
+        "大客户报价折扣能批到几折？",
+        "企业客户的分层路由规则是什么？"
+      ],
+      chipHint: "前两问全员可见；三、四问仅 admin；五、六问 sales 及以上可见"
+    },
+    gtm_research: {
+      hint: "GTM 账户情报：按 信号 / ICP 路由 / 套餐 / 案例 四维拆解，输出可下载简报",
+      chips: [
+        "一家 400 人、月均 300 笔跨境付款的外贸公司刚完成 B 轮融资、计划拓展东南亚，帮我做账户情报分析并给路由建议"
+      ],
+      chipHint: "示例参数已确保确定性：400 人 → 企业客户层；月均 300 笔 → AE 直跟；B 轮融资 → 高优先级信号"
+    }
+  };
+  var currentWf = "knowledge_qa";
+
+  // ---------- 工具 ----------
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+  function roleText(role) {
+    if (role === "viewer") return "viewer 仅可检索 public/ 目录";
+    if (role === "sales")  return "sales 可检索 public/ 与 gtm/ 目录";
+    if (role === "admin")  return "admin 可检索全部目录";
+    return "";
+  }
+  function modeText(mode) {
+    return mode === "llm" ? "LLM 生成" : (mode === "extractive" ? "抽取式" : "无命中");
+  }
+  function scrollBottom() { mainEl.scrollTop = mainEl.scrollHeight; }
+  function circled(n) {                       // ①②③… 子问题编号
+    return n >= 1 && n <= 20 ? String.fromCharCode(0x2460 + n - 1) : String(n);
+  }
+
+  // ISO 时间戳 -> "MM-DD HH:MM:SS"
+  function fmtTime(ts) {
+    var s = String(ts || "");
+    if (!s) return "-";
+    s = s.replace("T", " ");
+    var dot = s.indexOf(".");
+    if (dot > 0) s = s.slice(0, dot);
+    var plus = s.indexOf("+");
+    if (plus > 0) s = s.slice(0, plus);
+    return s.slice(5);
+  }
+
+  // ---------- chips 渲染 ----------
+  // 欢迎区 chips 在对话开始后随 #empty 一起被移除, 因此输入区保留一份常驻副本,
+  // 保证对话中途切换工作流时示例问题仍然可见可点
+  function buildChip(q) {
+    var b = document.createElement("button");
+    b.className = "chip" + (q.length > 20 ? " long" : "");
+    b.setAttribute("data-q", q);
+    b.textContent = q;
+    return b;
+  }
+
+  function renderChips() {
+    var cfg = WORKFLOWS[currentWf];
+    if (!cfg) return;
+    if (chipsEl && chipsEl.isConnected) {
+      chipsEl.innerHTML = "";
+      cfg.chips.forEach(function (q) { chipsEl.appendChild(buildChip(q)); });
+    }
+    if (chipsFootEl) {
+      chipsFootEl.innerHTML = "";
+      cfg.chips.forEach(function (q) { chipsFootEl.appendChild(buildChip(q)); });
+    }
+    if (chipHintEl) chipHintEl.textContent = cfg.chipHint || "";
+    Array.prototype.forEach.call(document.querySelectorAll(".seg-hint"), function (h) {
+      h.textContent = cfg.hint || "";
+    });
+  }
+
+  function switchWorkflow(wf) {
+    if (!WORKFLOWS[wf]) return;
+    currentWf = wf;
+    Array.prototype.forEach.call(document.querySelectorAll(".seg-btn"), function (b) {
+      b.classList.toggle("active", b.getAttribute("data-wf") === wf);
+    });
+    renderChips();
+  }
+
+  // ---------- 消息渲染 ----------
+  function hideEmpty() {
+    if (emptyEl) { emptyEl.remove(); emptyEl = null; }
+    if (chipsFootEl) chipsFootEl.hidden = false;   // 欢迎区移除后, 输入区 chips 接管
+  }
+
+  function addRow(kind) {
+    hideEmpty();
+    var row = document.createElement("div");
+    row.className = "row " + kind;
+    var av = document.createElement("div");
+    av.className = "avatar " + (kind === "user" ? "me" : "bot");
+    av.textContent = kind === "user" ? "我" : "AI";
+    var bubble = document.createElement("div");
+    bubble.className = "bubble";
+    row.appendChild(av);
+    row.appendChild(bubble);
+    thread.appendChild(row);
+    scrollBottom();
+    return { row: row, bubble: bubble };
+  }
+
+  function addUser(text) {
+    var r = addRow("user");
+    r.bubble.textContent = text;
+  }
+
+  function addThinking() {
+    var r = addRow("bot");
+    r.bubble.innerHTML =
+      '<span class="thinking">思考中<span class="dots"><i></i><i></i><i></i></span></span>';
+    return r;
+  }
+
+  function addError(msg) {
+    var r = addRow("error");
+    r.bubble.textContent = "请求失败：" + msg;
+  }
+
+  function addAnswer(data) {
+    var r = addRow("bot");
+    var subs = data.sub_queries || [];
+
+    // 思考过程: 多跳生效(子问题 > 1)时展示拆解结果
+    if (data.agent && subs.length > 1) {
+      var plan = document.createElement("div");
+      plan.className = "plan";
+      var pt = document.createElement("div");
+      pt.className = "plan-title";
+      pt.textContent = "思考过程 · 拆解 " + subs.length + " 个子问题";
+      plan.appendChild(pt);
+      var ol = document.createElement("ol");
+      ol.className = "plan-list";
+      subs.forEach(function (q, i) {
+        var li = document.createElement("li");
+        li.innerHTML = '<span class="num">' + circled(i + 1) + "</span>" + esc(q);
+        ol.appendChild(li);
+      });
+      plan.appendChild(ol);
+      r.bubble.appendChild(plan);
+    }
+
+    // 正文
+    var body = document.createElement("div");
+    body.textContent = data.answer || "";
+    r.bubble.appendChild(body);
+
+    // 模式标签 + 工作流 pill
+    var meta = document.createElement("div");
+    meta.className = "meta";
+    var tag = document.createElement("span");
+    var mode = data.mode || "no_context";
+    tag.className = "tag " + mode;
+    tag.textContent = modeText(mode);
+    meta.appendChild(tag);
+    if (data.workflow === "gtm_research") {
+      var wp = document.createElement("span");
+      wp.className = "pill wf-gtm";
+      wp.textContent = "GTM 调研";
+      meta.appendChild(wp);
+    }
+    if (data.agent && subs.length > 1) {
+      var ap = document.createElement("span");
+      ap.className = "pill";
+      ap.textContent = "多跳 agent";
+      meta.appendChild(ap);
+    }
+    r.bubble.appendChild(meta);
+
+    // 可观测: 耗时 + 来源数
+    var ms = (data.elapsed_ms != null ? data.elapsed_ms : data.latency_ms);
+    if (ms != null) {
+      var obs = document.createElement("div");
+      obs.className = "obs";
+      obs.textContent = "⏱ " + (Number(ms) / 1000).toFixed(1) + "s · " +
+                        ((data.sources || []).length) + " 来源";
+      r.bubble.appendChild(obs);
+    }
+
+    // 来源引用 (带平台徽章)
+    var box = document.createElement("div");
+    box.className = "sources";
+    var t = document.createElement("div");
+    t.className = "sources-title";
+    var list = data.sources || [];
+    t.textContent = "来源引用 (" + list.length + ")";
+    box.appendChild(t);
+
+    if (!list.length) {
+      var none = document.createElement("div");
+      none.className = "src-empty";
+      none.textContent = mode === "no_context"
+        ? "未检索到可访问文档（可能被 RBAC 拦截或知识库为空）"
+        : "无来源";
+      box.appendChild(none);
+    } else {
+      list.forEach(function (s, i) {
+        var plat = s.source || "Confluence";
+        var item = document.createElement("div");
+        item.className = "src";
+        item.innerHTML =
+          '<span class="idx">' + (i + 1) + '.</span>' +
+          '<span class="ref"><span class="plat ' + esc(plat) + '">' + esc(plat) + '</span>' +
+          '<span class="path">' + esc(s.path) + '</span>' +
+          '<span class="title"> :: ' + esc(s.title) + '</span></span>' +
+          '<span class="score">' + Number(s.score).toFixed(3) + '</span>';
+        box.appendChild(item);
+      });
+    }
+    r.bubble.appendChild(box);
+
+    // 账户情报简报: 提供 .md 下载 (纯前端 Blob, 不动后端)
+    if (data.workflow === "gtm_research" && list.length) {
+      var dl = document.createElement("button");
+      dl.className = "dl-btn";
+      dl.textContent = "下载简报.md";
+      dl.addEventListener("click", function () { downloadReport(data); });
+      r.bubble.appendChild(dl);
+    }
+    scrollBottom();
+  }
+
+  // ---------- 简报下载 (前端 Blob) ----------
+  function downloadReport(data) {
+    var lines = [];
+    lines.push(data.answer || "");
+    if ((data.answer || "").indexOf("## 来源引用") === -1) {
+      lines.push("");
+      lines.push("## 来源引用");
+      (data.sources || []).forEach(function (s, i) {
+        lines.push((i + 1) + ". [" + (s.source || "Confluence") + "] " +
+                   s.path + " :: " + s.title + " · " + Number(s.score).toFixed(3));
+      });
+    }
+    lines.push("");
+    lines.push("> 由 Meridian Pay 知识大脑 · 账户情报工作流生成");
+
+    var blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "账户情报简报-" + fmtTime(data.ts).replace(/[ :]/g, "-") + ".md";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  // ---------- 聊天交互 ----------
+  function autoGrow() {
+    inputEl.style.height = "auto";
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + "px";
+  }
+
+  function setBusy(v) {
+    busy = v;
+    sendBtn.disabled = v;
+    sendBtn.textContent = v ? "处理中" : "发送";
+  }
+
+  function send(question) {
+    question = (question || "").trim();
+    if (!question || busy) return;
+
+    var username = (userEl.value || "").trim() || "admin";
+    var role = roleEl.value || "admin";
+
+    addUser(question);
+    inputEl.value = "";
+    autoGrow();
+    var thinking = addThinking();
+    setBusy(true);
+
+    fetch("/api/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: question,
+        username: username,
+        role: role,
+        workflow: currentWf,     // 工作流随分段选择器切换
+        agent: true              // 默认多跳; 回归测试可传 false
+      })
+    })
+      .then(function (resp) {
+        return resp.json().then(function (data) {
+          return { ok: resp.ok, status: resp.status, data: data };
+        });
+      })
+      .then(function (res) {
+        thinking.row.remove();
+        if (!res.ok) {
+          addError((res.data && res.data.error) || ("HTTP " + res.status));
+        } else {
+          addAnswer(res.data);
+        }
+      })
+      .catch(function (err) {
+        thinking.row.remove();
+        addError(String(err));
+      })
+      .then(function () { setBusy(false); });
+  }
+
+  sendBtn.addEventListener("click", function () { send(inputEl.value); });
+
+  inputEl.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      send(inputEl.value);
+    }
+  });
+  inputEl.addEventListener("input", autoGrow);
+
+  // chips 用 document 级事件委托 (欢迎区/输入区两份 chips 共用), 切换工作流后无需重新绑定
+  document.addEventListener("click", function (e) {
+    var chip = e.target.closest ? e.target.closest(".chip") : null;
+    if (!chip || e.target.closest("#empty") === null && e.target.closest("#chipsFoot") === null) return;
+    inputEl.value = chip.getAttribute("data-q");
+    autoGrow();
+    send(inputEl.value);
+  });
+
+  // 工作流切换: 欢迎区与输入区两份选择器共享状态, 用 document 级委托
+  if (segFootEl) segFootEl.innerHTML = '<div class="seg">' + segEl.innerHTML + "</div>";
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest ? e.target.closest(".seg-btn") : null;
+    if (!btn) return;
+    switchWorkflow(btn.getAttribute("data-wf"));
+  });
+
+  // ---------- 审计日志 ----------
+  function renderAudit(records) {
+    if (!records.length) {
+      auditBody.innerHTML = '<tr><td class="empty-row" colspan="6">暂无审计记录</td></tr>';
+      return;
+    }
+    var html = "";
+    records.forEach(function (r) {
+      var mode = r.answer_mode || "no_context";
+      html +=
+        "<tr>" +
+        '<td class="mono">' + esc(fmtTime(r.ts)) + "</td>" +
+        "<td>" + esc(r.user) + "</td>" +
+        '<td><span class="pill ' + esc(r.role) + '">' + esc(r.role) + "</span></td>" +
+        '<td class="q">' + esc(r.question) + "</td>" +
+        "<td>" + (r.source_count || 0) + "</td>" +
+        '<td><span class="tag ' + esc(mode) + '">' + esc(modeText(mode)) + "</span></td>" +
+        "</tr>";
+    });
+    auditBody.innerHTML = html;
+  }
+
+  function loadAudit() {
+    var role = roleEl.value || "admin";
+    if (role !== "admin") {                      // 非 admin (sales/viewer) 不发起请求
+      auditBody.innerHTML = '<tr><td class="empty-row" colspan="6">当前角色无权查看</td></tr>';
+      return;
+    }
+    auditBody.innerHTML = '<tr><td class="empty-row" colspan="6">加载中…</td></tr>';
+    fetch("/api/audit?limit=" + AUDIT_LIMIT + "&role=" + encodeURIComponent(role))
+      .then(function (resp) {
+        return resp.json().then(function (d) { return { ok: resp.ok, data: d }; });
+      })
+      .then(function (res) {
+        if (!res.ok) {
+          auditBody.innerHTML = '<tr><td class="err-row" colspan="6">' +
+            esc((res.data && res.data.error) || "加载失败") + "</td></tr>";
+          return;
+        }
+        var recs = (res.data && res.data.records) || [];
+        auditSub.textContent = "最近 " + recs.length + " 条问答记录";
+        renderAudit(recs);
+      })
+      .catch(function (err) {
+        auditBody.innerHTML = '<tr><td class="err-row" colspan="6">' + esc(String(err)) + "</td></tr>";
+      });
+  }
+
+  function openAudit() { maskEl.hidden = false; loadAudit(); }
+  function closeAudit() { maskEl.hidden = true; }
+
+  auditBtn.addEventListener("click", openAudit);
+  refreshBtn.addEventListener("click", loadAudit);
+  closeBtn.addEventListener("click", closeAudit);
+  maskEl.addEventListener("mousedown", function (e) {
+    if (!drawerEl.contains(e.target)) closeAudit();   // 点击遮罩关闭
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !maskEl.hidden) closeAudit();
+  });
+
+  // ---------- 角色切换 ----------
+  function syncRole() {
+    var role = roleEl.value || "admin";
+    hintEl.textContent = roleText(role);
+    auditBtn.hidden = (role !== "admin");              // 仅 admin 显示审计入口
+    if (role !== "admin" && !maskEl.hidden) closeAudit();
+  }
+  roleEl.addEventListener("change", syncRole);
+  syncRole();
+
+  // ---------- 健康检查 ----------
+  fetch("/api/health")
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      healthEl.innerHTML = "索引就绪 · <b>" + (d.chunks || 0) + "</b> 分块 / " +
+                           (d.documents || 0) + " 文档";
+    })
+    .catch(function () { healthEl.textContent = "服务未连接"; });
+
+  switchWorkflow(currentWf);      // 初始化工作流选择器与 chips (含输入区副本)
+  autoGrow();
+  inputEl.focus();
+})();
+</script>
+</body>
+</html>
