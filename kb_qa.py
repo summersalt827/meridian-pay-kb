@@ -745,42 +745,57 @@ class Generator:
         """合成步: 用工作流的 synth_prompt 生成带来源编号的最终答案。"""
         ctx = self.build_context(sources)
         prompt = f"{synth_prompt}\n\n来源资料:\n{ctx}\n\n用户问题 / 调研请求: {question}"
-        return self._post_chat("你是一个严谨的企业知识助手。", prompt)
+        return self._post_chat("你是一个严谨的企业知识助手。", prompt, timeout=60)
 
     # ---- 底层 ----
 
     @staticmethod
-    def build_context(sources: list[tuple[Chunk, float]]) -> str:
-        """把来源拼成带编号的上下文 (平台名仅在此处展示, 不进索引)。"""
-        return "\n\n".join(
-            f"[来源{i+1}] {c.path} :: {c.title}（平台: {getattr(c, 'doc_source', DEFAULT_DOC_SOURCE)}）\n{c.content}"
-            for i, (c, _) in enumerate(sources)
-        )
+    def build_context(sources: list[tuple[Chunk, float]], max_chars: int = 900) -> str:
+        """把来源拼成带编号的上下文 (平台名仅在此处展示, 不进索引); 单来源截断防撑爆上下文。"""
+        parts: list[str] = []
+        for i, (c, _) in enumerate(sources):
+            content = c.content.strip().replace("\n", " ")
+            if len(content) > max_chars:
+                content = content[:max_chars] + "…"
+            parts.append(
+                f"[来源{i+1}] {c.path} :: {c.title}（平台: {getattr(c, 'doc_source', DEFAULT_DOC_SOURCE)}）\n{content}"
+            )
+        return "\n\n".join(parts)
 
-    def _post_chat(self, system: str, prompt: str, temperature: float = 0.2) -> str:
-        """OpenAI 兼容 chat/completions 的通用调用。"""
+    def _post_chat(self, system: str, prompt: str, temperature: float = 0.2,
+                   timeout: int | None = None, retries: int = 1) -> str:
+        """OpenAI 兼容 chat/completions 的通用调用 (瞬时故障自动重试一次, 保演示稳定)。"""
         import requests  # 延迟导入
         if not self.llm_ready():
             raise RuntimeError("未配置 LLM_BASE_URL / LLM_API_KEY")
         url = self.cfg.llm_base_url.rstrip("/") + "/chat/completions"
-        resp = requests.post(
-            url,
-            headers={
-                "Authorization": f"Bearer {self.cfg.llm_api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": self.cfg.llm_model,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": temperature,
-            },
-            timeout=self.cfg.llm_timeout,
-        )
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"].strip()
+        last_err: Exception | None = None
+        for attempt in range(retries + 1):
+            try:
+                resp = requests.post(
+                    url,
+                    headers={
+                        "Authorization": f"Bearer {self.cfg.llm_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": self.cfg.llm_model,
+                        "messages": [
+                            {"role": "system", "content": system},
+                            {"role": "user", "content": prompt},
+                        ],
+                        "temperature": temperature,
+                    },
+                    timeout=timeout or self.cfg.llm_timeout,
+                )
+                resp.raise_for_status()
+                return resp.json()["choices"][0]["message"]["content"].strip()
+            except Exception as e:
+                last_err = e
+                if attempt < retries:
+                    time.sleep(1.5)     # 瞬时故障: 重试一次 (视频录制稳定性)
+        assert last_err is not None
+        raise last_err
 
     def _call_llm(self, query: str, ctx: str) -> str:
         prompt = (
@@ -1066,7 +1081,11 @@ class AuditLog:
         self._init()
 
     def _conn(self):
-        return sqlite3.connect(self.db_path)
+        # WAL + busy_timeout: ThreadingHTTPServer 多线程并发写审计时避免 "database is locked"
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+        return conn
 
     def _init(self):
         with self._conn() as conn:
