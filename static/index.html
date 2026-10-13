@@ -161,7 +161,7 @@
     background: #fff; color: var(--blue); font-weight: 600;
     box-shadow: 0 1px 2px rgba(15, 23, 42, .08);
   }
-  .seg-hint { font-size: 12px; color: #94A3B8; }
+  .seg-hint { font-size: 12px; color: #475569; }
 
   .chips { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
   .chip {
@@ -171,7 +171,7 @@
   }
   .chip:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-soft); }
   .chip.long { max-width: 620px; border-radius: 12px; line-height: 1.5; }
-  .chip-hint { margin: 16px 0 0; font-size: 12px; color: #94A3B8; }
+  .chip-hint { margin: 16px 0 0; font-size: 12px; color: #475569; }
 
   .row { display: flex; gap: 10px; align-items: flex-start; }
   .row.user { flex-direction: row-reverse; }
@@ -181,7 +181,7 @@
     display: flex; align-items: center; justify-content: center;
   }
   .avatar.bot  { background: var(--blue); }
-  .avatar.me   { background: #94A3B8; }
+  .avatar.me   { background: #475569; }
   .bubble {
     max-width: 78%; padding: 12px 14px; border-radius: var(--radius);
     box-shadow: var(--shadow); white-space: pre-wrap; word-break: break-word;
@@ -262,7 +262,7 @@
   .vote-btn.voted { border-color: var(--blue); color: var(--blue); }
   .audit-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
   .stat { font-size: 11.5px; padding: 3px 8px; border-radius: 6px; background: #F5F3FF; color: #4C1D95; }
-  .obs { font-size: 11px; color: #94A3B8; margin-bottom: 8px; }
+  .obs { font-size: 11px; color: #475569; margin-bottom: 8px; }
 
   .sources {
     border-top: 1px dashed var(--line); padding-top: 10px;
@@ -274,7 +274,7 @@
     font-size: 12px; padding: 6px 10px;
     background: #FAF9FE; border: 1px solid #EDE9FE; border-radius: 8px;
   }
-  .src .idx { color: #94A3B8; flex: 0 0 18px; }
+  .src .idx { color: #475569; flex: 0 0 18px; }
   .src .ref { flex: 1 1 auto; min-width: 0; }
   .src .path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--blue); }
   .src .title { color: var(--muted); }
@@ -327,9 +327,9 @@
   }
   .send:hover:not(:disabled) { filter: brightness(1.08); }
   .send:disabled { opacity: .5; cursor: not-allowed; }
-  .tip { max-width: 880px; margin: 8px auto 0; font-size: 11px; color: #94A3B8; text-align: right; }
+  .tip { max-width: 880px; margin: 8px auto 0; font-size: 11px; color: #475569; text-align: right; }
   .seg-foot { max-width: 880px; margin: 0 auto 8px; display: flex; align-items: center; gap: 10px; }
-  .seg-foot .seg-hint { font-size: 11px; color: #94A3B8; }
+  .seg-foot .seg-hint { font-size: 11px; color: #475569; }
 
   /* ---------- 审计日志抽屉 ---------- */
   .mask {
@@ -426,7 +426,7 @@
 </header>
 
 <main id="main">
-  <div class="thread" id="thread">
+  <div class="thread" id="thread" role="log" aria-live="polite" aria-relevant="additions">
     <div class="empty" id="empty">
       <div class="hero">
         <h2>企业知识大脑 · 多跳 Agent 驱动</h2>
@@ -438,8 +438,8 @@
         </div>
         <div class="seg-wrap">
           <div class="seg" id="seg">
-            <button type="button" class="seg-btn active" data-wf="knowledge_qa">知识问答</button>
-            <button type="button" class="seg-btn" data-wf="gtm_research">账户情报</button>
+            <button type="button" class="seg-btn active" data-wf="knowledge_qa" aria-pressed="true">知识问答</button>
+            <button type="button" class="seg-btn" data-wf="gtm_research" aria-pressed="false">账户情报</button>
           </div>
           <span class="seg-hint" id="segHint">通用知识问答：多跳检索 + 来源引用</span>
         </div>
@@ -616,7 +616,9 @@
     if (!WORKFLOWS[wf]) return;
     currentWf = wf;
     Array.prototype.forEach.call(document.querySelectorAll(".seg-btn"), function (b) {
-      b.classList.toggle("active", b.getAttribute("data-wf") === wf);
+      var on = b.getAttribute("data-wf") === wf;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
     });
     renderChips();
   }

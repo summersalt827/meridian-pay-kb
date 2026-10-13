@@ -1,5 +1,8 @@
 # Meridian Pay 知识大脑 (KB-QA Agent Platform)
 
+> **Ask once. Every sub-question is permission-checked. Zero leaks — measured, not promised.**
+> 一次提问，多跳拆解；每个子问题都过权限；零泄露不是架构声明，是 26 项红队攻击实测的数字。
+
 ![tests](https://github.com/summersalt827/meridian-pay-kb/actions/workflows/tests.yml/badge.svg)
 
 腾讯云 AI CAN DO IT Hackathon 2026 · FinTech 赛道（Aspire 出题）
@@ -84,6 +87,24 @@ Web 界面、鉴权与相关性门标定、GTM 语料、账户情报 agent。会
 Claude Code 负责补丁合并、四套评测质量门与 UI 打磨——完整分工叙事见
 [`docs/AI-COLLABORATION.md`](docs/AI-COLLABORATION.md)。
 
+## 谁在用（persona）
+
+| Persona | 需求 | 我们的回答 |
+|---|---|---|
+| 合规/内审（alice · admin） | 「谁问了什么、答了什么、基于哪篇文档」可追溯 | 审计抽屉 + SQLite 全量审计（MAS FEAT accountability 证据） |
+| 销售（sam · sales） | 快速拿折扣/案例/ICP 规则；碰敏感数据被干净拦截 | 子问题级 RBAC：命中所属目录，越权拿 no_context |
+| 新员工/外部协作者（bob · viewer） | 只读公开手册 | 目录级白名单：public only |
+| GTM 团队 | 单客户调研 2-3 小时 → 30 秒 | gtm_research 账户情报简报（评分卡/路由/首触邮件草稿/需人工决策清单） |
+
+## 市面上有什么（what's out there）
+
+| 现状 | 它们怎么做 | 我们的差异 |
+|---|---|---|
+| Onyx（32k★）企业搜索 | 连接 50+ 应用，RBAC 覆盖 web/API | 我们是 agent 平台不是搜索：多跳规划 + 工作流注册表；权限下探到**子问题级**——拆解后的查询也捞不出越权文档 |
+| VaultRAG ACL 前置检索 | ACL 谓词进检索查询，越权 chunk 不进流程 | 同属 pre-retrieval 过滤（OWASP LLM08 推荐），另加**绝对可比相关性门**（0.17 标定）——能区分「内容存在但你没权限」和「内容不存在」 |
+| RAGFlow / LightRAG 图谱编译 | 图索引增强多跳 | 我们选混合检索 + 标定门（同等召回、可测试性更强）；图谱编译列为 roadmap |
+| 通用 RAG demo | 无权限概念，撞词就答 | 宁可 no_context，不给没有依据的答案（诚实拒绝卡） |
+
 ## 评审速览（For judges）
 
 - **[需求映射表](docs/requirements-map.md)** — Aspire 出题每条要求 → 机制 → 文档 → 可见产物；
@@ -139,6 +160,7 @@ test_redteam.py     红队对抗套件（26 项攻击检查，零泄漏）
 docs/requirements-map.md  需求映射表（Aspire brief → 机制 → 证据 + 评审维度对照）
 docs/architecture.md  架构与信任边界（mermaid 流水线 + 三区职责表）
 docs/RED-TEAM-REPORT.md  红队报告（攻击矩阵 + 每组的"为什么"）
+docs/UX-ACCESSIBILITY-AUDIT.md  无障碍审计（WCAG 2.2 AA 对比度实测 + 已应用修复）
 docs/AI-COLLABORATION.md  AI 协作分工叙事（WorkBuddy 主构建 + Claude Code 合并验证）
 docs/build-sessions/  WorkBuddy 会话①-⑤ prompt 全文 + 9/26 试跑对话记录
 scripts/demo_path.py  demo 路径 e2e 证明（三角色命中/拦截/审计/401/403）
