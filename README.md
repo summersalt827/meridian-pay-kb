@@ -65,14 +65,14 @@ flowchart LR
 
 > 演示语料 `sample_docs/` 为虚构 Meridian Pay（B2B fintech）数据，角色、文档与审计记录均为演示用途（honest simulation）。
 
-## 评测（五套，107 断言 — 2026-10-13 全绿）
+## 评测（五套，115 断言 — 2026-10-13 全绿）
 
 | 套件 | 用例 | 断言 | 结果 | 关键数字 |
 |------|------|------|------|----------|
 | test_rbac.py | 8 | 金标准：leak rate = 0 + recall 漏检 = 0（成对断言） | 8/8 ✅ | **leak rate = 0 · recall 漏检 = 0** |
-| test_relevance.py | 21 | 无关必 no_context + 正样本必命中 + 分数可分性（0.17 标定） | 21/21 ✅ | 无关最高 0.1519 < 0.17 < 命中最低 0.2469（余量 1.12x / 1.45x） |
+| test_relevance.py | 21 | 无关必 no_context + 正样本必命中 + 分数可分性（0.17 标定） | 21/21 ✅ | 无关最高 0.1519 < 0.17 < 命中最低 0.2469（余量 1.14x / 1.45x） |
 | test_auth.py | 23 | 认证攻击面：无令牌/伪造角色/篡改 payload/登出吊销/越权入口 | 23/23 ✅ | 23 攻击面用例全绿 |
-| test_web_matrix.py | 29 | 18 组角色矩阵 + 审计权限 + agent 工作流用例 | 29/29 ✅ | 18 组角色矩阵全绿 |
+| test_web_matrix.py | 37 | 18 组角色矩阵 + 审计权限 + agent 工作流用例 + **8 金融岗位用例**（合规/风控/卡运营/财务） | 37/37 ✅ | 全矩阵全绿 |
 | test_redteam.py | 26 | **红队对抗**：语义改写 8 + 提示注入 4 + 路径逃逸 2 + 角色伪造 4 + 多跳拼图泄漏 3 + 阈值压制 2 + 反作弊回归 3 | 26/26 ✅ | **26 种攻击零泄漏**（报告见 [RED-TEAM-REPORT](docs/RED-TEAM-REPORT.md)） |
 
 评测轴对齐行业框架：0 role violations、0 PII leaks、faithfulness 100%（0 幻觉引用）。
@@ -91,7 +91,11 @@ Claude Code 负责补丁合并、四套评测质量门与 UI 打磨——完整�
 
 | Persona（Aspire 业务语境） | 需求 | 我们的回答 |
 |---|---|---|
-| 合规/内审（alice · admin） | 查资金结算 SOP 与 MAS/PDPA 合规要求；「谁问了什么、答了什么、基于哪篇文档」可追溯 | 审计抽屉 + SQLite 全量审计（MAS FEAT accountability 证据 + Notice 626 STR-readiness 文档） |
+| 合规/内审（alice · admin） | 全量可见 + 「谁问了什么、答了什么、基于哪篇文档」可追溯 | 审计抽屉 + SQLite 全量审计（MAS FEAT accountability 证据 + Notice 626 STR-readiness 文档） |
+| 合规官（cara · compliance_officer） | 查 KYC/AML 政策、可疑交易上报时限、PDPA 要点 | compliance 目录（KYC 文件清单 / 监管检查清单） |
+| 风控分析师（ray · risk_analyst） | 查交易监控阈值与频次规则 | compliance + risk 目录 |
+| 卡运营（erin · card_ops） | 查企业卡发卡条件与卡片状态规则 | card_ops 目录；问合规内容被干净拦截 |
+| 财务分析师（fay · finance_analyst） | 查支出管理政策与差旅标准 | finance 目录 |
 | 销售/客户经理（sam · sales） | 快速拿折扣治理/案例/ICP 规则；碰薪酬等敏感数据被干净拦截 | 子问题级 RBAC：命中所属目录，越权拿 no_context |
 | 新员工/外部协作者（bob · viewer） | 只读入职指南与报销 FAQ | 目录级白名单：public only |
 | GTM 团队 | 单客户调研 2-3 小时 → 30 秒（brief 的 GTM Engineering workflow） | gtm_research 账户情报简报（评分卡/ICP 路由/首触邮件草稿/需人工决策清单） |
@@ -121,8 +125,9 @@ Claude Code 负责补丁合并、四套评测质量门与 UI 打磨——完整�
 | 2 | 问「薪酬带宽是多少？」 | 命中 internal/roadmap + 来源引用卡片 + 平台徽章 + 规划块 |
 | 3 | 登出，登录 `sam / meridian-demo`（sales），问**同一问题** | 干净 no_context 拒绝卡（RBAC 拦截特写，全片 wow moment） |
 | 4 | 问「大客户报价折扣能批到几折？」 | 命中 gtm/pricing（sales 权限内） |
-| 5 | 切到「账户情报」工作流，问「计划拓展东南亚，帮我做账户情报分析并给路由建议」 | 评分卡 / ICP 路由 / 首触邮件草稿 / 需人工决策清单 |
+| 5 | 切到「账户情报」工作流，问「计划拓展东南亚，帮我做账户情报分析并给路由建议」 | 规划块拆解 4 个子问题（每个独立过 RBAC）→ 评分卡 / ICP 路由 / 首触邮件草稿 / 需人工决策清单 |
 | 6 | 登回 alice，打开审计抽屉 | 全量留痕：谁问了什么、被拦了什么、基于哪篇文档 |
+| 7 | 进阶：登录 `cara`（合规官）问「可疑交易上报的时限是多少？」→ 命中合规文档；换 `erin`（卡运营）同问 → 拦截 | 金融岗位 × 目录权限矩阵的第二个对比镜头 |
 
 也可一条命令重放全部 8 个场景并截图：`KB_DEMO_URL=<你的URL> python3 screenshot_demo.py`
 
@@ -133,7 +138,10 @@ pip install -r requirements.txt
 python3 web_ui.py          # http://localhost:8000
 ```
 
-演示账号：`alice`(admin) / `sam`(sales) / `bob`(viewer)，统一口令 `meridian-demo`。
+演示账号（统一口令 `meridian-demo`）：
+
+- `alice`(admin 全量) · `sam`(sales) · `bob`(viewer)
+- `cara`(compliance_officer 合规) · `ray`(risk_analyst 风控) · `erin`(card_ops 卡运营) · `fay`(finance_analyst 财务)
 
 LLM 模式（OpenAI 兼容接口，无 Key 自动回退抽取式）：
 
@@ -158,7 +166,8 @@ KB_AUTH_SECRET=$(openssl rand -hex 24) python3 web_ui.py
 
 `render.yaml` Blueprint 一键部署。Dashboard 补两个环境变量：`LLM_API_KEY`、`KB_AUTH_SECRET`
 （均为 sync: false，不入仓库）。免费档 15 分钟无访问会休眠，用 UptimeRobot 每 10 分钟
-ping `/api/health` 保活。
+ping `/api/health` 保活。**免费层冷启动约 20-60 秒**：评委首访前请自行预热一次（部署后
+用无痕窗口点开计时确认）。
 
 ## 目录
 
@@ -181,5 +190,5 @@ docs/build-sessions/  WorkBuddy 会话①-⑤ prompt 全文 + 9/26 试跑对话�
 scripts/demo_path.py  demo 路径 e2e 证明（三角色命中/拦截/审计/401/403）
 .github/workflows/  CI：每次 push 跑五套 107 断言（无需 LLM key）
 证据/               WorkBuddy 聊天截图 12 张 + 本机演示截图 8 张 + 封面图
-sample_docs/        Meridian Pay 语料 8 篇（public/internal/gtm，虚构数据）
+sample_docs/        Meridian Pay 语料 14 篇（public/internal/gtm/compliance/risk/card_ops/finance，虚构数据）
 ```

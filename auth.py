@@ -45,6 +45,10 @@ DEMO_ACCOUNTS: tuple[tuple[str, str, str], ...] = (
     ("alice", "admin", "Alice（管理员）"),
     ("sam", "sales", "Sam（销售）"),
     ("bob", "viewer", "Bob（只读访客）"),
+    ("cara", "compliance_officer", "Cara（合规官）"),
+    ("ray", "risk_analyst", "Ray（风控分析师）"),
+    ("erin", "card_ops", "Erin（卡运营）"),
+    ("fay", "finance_analyst", "Fay（财务分析师）"),
 )
 
 DEFAULT_DEMO_PASSWORD = "meridian-demo"        # 演示口令; 用 KB_DEMO_PASSWORD 覆盖

@@ -86,6 +86,10 @@ ROLE_ALLOWED_DIRS: dict[str, tuple[str, ...]] = {
     "admin": (),
     "sales": ("public", "gtm"),
     "viewer": ("public",),
+    "compliance_officer": ("public", "compliance"),
+    "risk_analyst": ("public", "compliance", "risk"),
+    "card_ops": ("public", "card_ops"),
+    "finance_analyst": ("public", "finance"),
 }
 
 # 可用工作流 (来自 kb_qa.WORKFLOWS 注册表, 这里只做接口层的白名单)

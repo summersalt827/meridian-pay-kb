@@ -33,4 +33,4 @@ python3 web_ui.py                              # server on :8000 (LLM optional �
 python3 test_redteam.py                        # 26 checks, exit 0 = all green
 ```
 
-CI runs all five suites (107 assertions) on every push — `python3 test_redteam.py` included.
+CI runs all five suites (115 assertions) on every push — `python3 test_redteam.py` included.

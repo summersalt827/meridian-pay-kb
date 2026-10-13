@@ -84,10 +84,15 @@ def _request(method: str, path: str, body: dict | None = None,
 
 def login(role: str) -> str:
     """按角色登录, 返回令牌; 失败则抛异常 (后续用例无从谈起)。"""
+    return login_raw(ROLE_ACCOUNT[role])
+
+
+def login_raw(username: str) -> str:
     status, data = _request("POST", "/api/login",
-                            {"username": ROLE_ACCOUNT[role], "password": DEMO_PASSWORD})
+                            {"username": username, "password": DEMO_PASSWORD})
     if status != 200 or not data.get("token"):
-        raise SystemExit(f"登录失败 ({role}): HTTP {status} {data.get('error', '')}")
+        raise SystemExit(f"登录失败 ({username}): HTTP {status} {data.get('error', '')}")
+    return data["token"]
     return data["token"]
 
 
@@ -250,6 +255,41 @@ def main() -> int:
     else:
         failures.append(f"A6 agent=false 忽略 workflow: HTTP {status} 期望 200")
         print(f"  ❌ A6 agent=false 忽略 workflow: HTTP {status} 期望 200")
+
+    # ============ 第三部分: 金融岗位新角色 (10/13 新增, 7 用例) ============
+    fin_accounts = {"compliance_officer": "cara", "risk_analyst": "ray",
+                    "card_ops": "erin", "finance_analyst": "fay"}
+    fin_tokens: dict[str, str] = {}
+    for role, username in fin_accounts.items():
+        fin_tokens[role] = login_raw(username)
+    fin_cases = [
+        ("compliance_officer", "KYC 需要哪些文件？", "compliance/kyc-aml-policy.md"),
+        ("compliance_officer", "可疑交易上报的时限是多少？", "compliance/kyc-aml-policy.md"),
+        ("compliance_officer", "PDPA 数据保护的要点有哪些？", "compliance/regulatory-checklist.md"),
+        ("card_ops", "企业卡发卡条件是什么？", "card_ops/card-program-rules.md"),
+        ("card_ops", "可疑交易上报的时限是多少？", "blocked"),
+        ("finance_analyst", "差旅住宿标准是什么？", "finance/spend-policy.md"),
+        ("risk_analyst", "交易监控的异常阈值是什么？", "risk/transaction-monitoring.md"),
+        ("admin", "KYC 需要哪些文件？", "compliance/kyc-aml-policy.md"),
+    ]
+    for role, question, expect in fin_cases:
+        total += 1
+        tok = tokens.get(role) or fin_tokens[role]
+        status, data = ask(question, role, tok, agent=False)
+        top1 = (data.get("sources") or [{}])[0].get("path", "") if data.get("sources") else ""
+        mode = data.get("mode")
+        if expect == "blocked":
+            ok = status == 200 and mode == "no_context" and not data.get("sources")
+            detail = f"mode={mode}"
+        else:
+            ok = status == 200 and mode != "no_context" and top1 == expect
+            detail = f"mode={mode} top1={top1 or '(无)'}"
+        if ok:
+            passed += 1
+            print(f"  ✅ F{role} × {question[:16]}: {detail}")
+        else:
+            failures.append(f"{role} × {question[:16]} 期望{expect}: {detail}")
+            print(f"  ❌ {role} × {question[:16]} 期望{expect}: {detail}")
 
     print(f"\n== 结果: {passed}/{total} 通过")
     if failures:
