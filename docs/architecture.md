@@ -19,15 +19,15 @@ flowchart LR
     PLAN["Planner<br/>decompose into sub-questions"]
     SYNTH["Synthesis<br/>cited answer / account briefing<br/>+ human-decisions list"]
   end
-  subgraph D["Deterministic — pure code, 81 assertions"]
-    RBAC["RBAC at sub-question level<br/>allowed_dirs filter"]
+  subgraph D["Deterministic — pure code · 7 suites / 139 assertions (CI)"]
+    RBAC["RBAC at sub-question level<br/>allowed_dirs + audience disclosure gate"]
     RET["Hybrid retrieval<br/>BM25 + TF-IDF"]
     GATE["Relevance gate 0.17<br/>absolute comparable score"]
     MERGE["Merge & dedupe"]
   end
   subgraph X["Storage"]
-    DOCS[("sample_docs — 8 docs<br/>public / internal / gtm")]
-    DB[("SQLite WAL<br/>audit trail + feedback")]
+    DOCS[("sample_docs — 16 docs / 7 dirs<br/>public · internal · gtm · compliance · risk · card_ops · finance")]
+    DB[("SQLite WAL<br/>append-only audit + hash chain + feedback")]
   end
   LOGIN --> AUTH --> API --> PLAN --> RBAC --> RET --> GATE --> MERGE --> SYNTH --> API --> LOGIN
   RET --> DOCS

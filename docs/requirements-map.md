@@ -55,10 +55,10 @@ We demonstrate **two**:
 |---|---|---|
 | 1. 统一自然语言查询（单一有引用的答案） | 多跳规划 → 子问题检索 → 合并合成，每个来源带路径/平台/分数 | 体验路径步骤 2：admin 命中 + 来源引用卡片 |
 | 2. 权限感知检索（先进过滤，后进 LLM） | 子问题级 RBAC（pre-retrieval ACL，OWASP LLM08 推荐控制）+ **audience 披露门**（客户在场模式：audience=external 之外的分块逐候选剔除，代码常量分级、不读文档自我声明）；角色只由服务端令牌签发 | 金标评测 **leak=0**；步骤 3：sales 同问被干净拦截；步骤 6：同一问题内部 4 文档 → 客户在场仅 case-studies（test_disclosure 11/11） |
-| 3. 数据新鲜度（有界窗口，分钟~1 小时） | `POST /api/resync`（admin）按需重扫 + `KB_RESYNC_MINUTES` 定时重扫 + 引用卡片带文档 mtime「更新于」 | 步骤 8：改文档 → 重扫 → 新内容可答；test_web_matrix R1-R5（含删除后不再可答） |
+| 3. 数据新鲜度（有界窗口，分钟~1 小时） | `POST /api/resync`（admin）按需重扫 + `KB_RESYNC_MINUTES` 定时重扫 + 引用卡片带文档 mtime「更新于」 | 步骤 9：改文档 → 重扫 → 新内容可答；test_web_matrix R1-R5（含删除后不再可答） |
 | 4. 负面权限案例（不泄露存在性） | 越权子问题检索为空；相关性门过滤后 `no_context` 拒绝卡（「证据不足 · 已拒绝回答」）；对外语境下内部文档既不进答案、也不进来源列表 | 步骤 3/8：被拦时只有拒绝卡，无来源列表；客户在场问折扣 → 干净 no_context |
 | 5. 实时权限变更（吊销即时生效） | 令牌内嵌角色，校验时与账号当前角色比对（`auth.py` verify_token）——角色一变，旧令牌立即 401 | test_auth 23 攻击面用例（改 payload 即验签失败） |
-| 6. 审计查询（防篡改、可重建） | SQLite WAL 全量审计 + **append-only 触发器 + SHA-256 哈希链**（重算验证可定位篡改行，test_audit_chain 6/6）；admin-only API + 聚合看板 | 步骤 6：审计抽屉「验证链」按钮 |
+| 6. 审计查询（防篡改、可重建） | SQLite WAL 全量审计 + **append-only 触发器 + SHA-256 哈希链**（重算验证可定位篡改行，test_audit_chain 6/6）；admin-only API + 聚合看板 | 步骤 7：审计抽屉「验证链」按钮 |
 | 7. LLM 泄露缓解（防幻觉/编造） | 回答只基于过门来源（faithfulness 100%，0 幻觉引用）；无来源宁拒不留 | 红队 26 项攻击零泄漏（[RED-TEAM-REPORT](RED-TEAM-REPORT.md)） |
 
 ## Judging dimensions → evidence (Handbook §10, 10 × 10 pts)

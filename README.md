@@ -136,7 +136,7 @@ Claude Code 负责补丁合并、四套评测质量门与 UI 打磨——完整�
 | 8 | 进阶：登录 `cara`（合规官）问「可疑交易上报的时限是多少？」→ 命中合规文档；换 `erin`（卡运营）同问 → 拦截 | 金融岗位 × 目录权限矩阵的第二个对比镜头 |
 | 9 | 进阶：改 `sample_docs/` 任一文档后，登录 `alice` 调 `POST /api/resync`，再问同一问题 | 新内容可答，引用卡带「更新于 HH:MM」——官方 worked example「数据新鲜度」 |
 
-也可一条命令重放全部 8 个场景并截图：`KB_DEMO_URL=<你的URL> python3 screenshot_demo.py`
+也可一条命令重放全部 9 个场景并截图：`KB_DEMO_URL=<你的URL> python3 screenshot_demo.py`
 
 ## 运行
 

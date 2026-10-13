@@ -13,6 +13,10 @@
      同一套多跳骨架 + 不同的 plan/synth prompt = 不同的业务 agent (knowledge_qa / gtm_research)
   7. 来源平台标注 (Confluence / Drive / Jira): 只存在于 DOC_SOURCES 代码常量,
      在摄入时挂到 chunk 上, 绝不写入文档正文, 因此不污染检索词面
+  9. 客户在场披露门 (audience): 第二道权限维度——对外语境下 internal 分块逐候选
+     剔除 (代码常量分级, 不读文档自我声明); 与 RBAC 同在候选阶段, 多跳子问题级自动生效
+ 10. 审计哈希链: append-only 触发器 (应用自身连接也无法 UPDATE/DELETE) + SHA-256
+     链, verify() 重算定位篡改行
   8. retriever 层 min_score 相关性阈值 (11/28 重写打分口径):
      旧口径把 BM25 与 TF-IDF 各自 min-max 归一化后加权, 排第一的分数恒接近 1.0,
      阈值 0.3 几乎从不触发——完全无关的长句也能带著 4 条来源过门 (实测可复现)。
