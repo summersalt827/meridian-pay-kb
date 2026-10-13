@@ -47,6 +47,7 @@
 **审计与可观测**
 
 - SQLite 全量问答审计（WAL 模式，并发安全）+ 反馈闭环（有用/无用投票入库）
+- 数据新鲜度：`POST /api/resync`（admin）按需重扫 + `KB_RESYNC_MINUTES` 定时重扫窗口（分钟级）+ 引用卡片带文档「更新于」时间——绝不静默提供过期内容
 - 审计抽屉聚合看板：总问答 / 模式分布 / 活跃用户 / 反馈数 / Top 文档
 - 查询规划块（子问题可视化）、耗时、来源引用 + 平台徽章（Confluence/Drive/Jira，代码常量映射）
 - no_context 设计化拒绝卡片：「证据不足 · 已拒绝回答」——宁可拒绝，不给没有依据的答案
@@ -67,14 +68,14 @@ flowchart LR
 
 > 演示语料 `sample_docs/` 为虚构 Meridian Pay（B2B fintech）数据，角色、文档与审计记录均为演示用途（honest simulation）。
 
-## 评测（五套，115 断言 — 2026-10-13 全绿）
+## 评测（五套，120 断言 — 2026-10-13 全绿）
 
 | 套件 | 用例 | 断言 | 结果 | 关键数字 |
 |------|------|------|------|----------|
 | test_rbac.py | 8 | 金标准：leak rate = 0 + recall 漏检 = 0（成对断言） | 8/8 ✅ | **leak rate = 0 · recall 漏检 = 0** |
 | test_relevance.py | 21 | 无关必 no_context + 正样本必命中 + 分数可分性（0.17 标定） | 21/21 ✅ | 无关最高 0.1492 < 0.17 < 命中最低 0.2464（余量 1.14x / 1.45x） |
 | test_auth.py | 23 | 认证攻击面：无令牌/伪造角色/篡改 payload/登出吊销/越权入口 | 23/23 ✅ | 23 攻击面用例全绿 |
-| test_web_matrix.py | 37 | 18 组角色矩阵 + 审计权限 + agent 工作流用例 + **8 金融岗位用例**（合规/风控/卡运营/财务） | 37/37 ✅ | 全矩阵全绿 |
+| test_web_matrix.py | 42 | 18 组角色矩阵 + 审计权限 + agent 工作流用例 + **8 金融岗位用例**（合规/风控/卡运营/财务）+ **5 数据新鲜度用例**（resync 权限 + 重扫 worked example） | 42/42 ✅ | 全矩阵全绿 |
 | test_redteam.py | 26 | **红队对抗**：语义改写 8 + 提示注入 4 + 路径逃逸 2 + 角色伪造 4 + 多跳拼图泄漏 3 + 阈值压制 2 + 反作弊回归 3 | 26/26 ✅ | **26 种攻击零泄漏**（报告见 [RED-TEAM-REPORT](docs/RED-TEAM-REPORT.md)） |
 
 评测轴对齐行业框架：0 role violations、0 PII leaks、faithfulness 100%（0 幻觉引用）。
@@ -130,6 +131,7 @@ Claude Code 负责补丁合并、四套评测质量门与 UI 打磨——完整�
 | 5 | 切到「账户情报」工作流，问「计划拓展东南亚，帮我做账户情报分析并给路由建议」 | 规划块拆解 4 个子问题（每个独立过 RBAC）→ 评分卡 / ICP 路由 / 首触邮件草稿 / 需人工决策清单 |
 | 6 | 登回 alice，打开审计抽屉 | 全量留痕：谁问了什么、被拦了什么、基于哪篇文档 |
 | 7 | 进阶：登录 `cara`（合规官）问「可疑交易上报的时限是多少？」→ 命中合规文档；换 `erin`（卡运营）同问 → 拦截 | 金融岗位 × 目录权限矩阵的第二个对比镜头 |
+| 8 | 进阶：改 `sample_docs/` 任一文档后，登录 `alice` 调 `POST /api/resync`，再问同一问题 | 新内容可答，引用卡带「更新于 HH:MM」——官方 worked example「数据新鲜度」 |
 
 也可一条命令重放全部 8 个场景并截图：`KB_DEMO_URL=<你的URL> python3 screenshot_demo.py`
 
@@ -181,7 +183,7 @@ static/index.html   聊天界面（登录/工作流选择器/规划块/平台徽
 test_rbac.py        金标准评测（leak=0 + recall=100%）
 test_relevance.py   相关性门标定评测（21 用例）
 test_auth.py        认证攻击面评测（23 用例，自起服务）
-test_web_matrix.py  Web 层矩阵（37 用例，含 8 个金融岗位矩阵）
+test_web_matrix.py  Web 层矩阵（42 用例，含 8 金融岗位 + 5 数据新鲜度）
 test_redteam.py     红队对抗套件（26 项攻击检查，零泄漏；跑前服务需以 KB_LOGIN_RATE_LIMIT=200 启动）
 docs/requirements-map.md  需求映射表（Aspire brief → 机制 → 证据 + 评审维度对照）
 docs/architecture.md  架构与信任边界（mermaid 流水线 + 三区职责表）
@@ -190,7 +192,7 @@ docs/UX-ACCESSIBILITY-AUDIT.md  无障碍审计（WCAG 2.2 AA 对比度实测 + 
 docs/AI-COLLABORATION.md  AI 协作分工叙事（WorkBuddy 主构建 + Claude Code 合并验证）
 docs/build-sessions/  WorkBuddy 会话①-⑤ prompt 全文 + 9/26 试跑对话记录
 scripts/demo_path.py  demo 路径 e2e 证明（三角色命中/拦截/审计/401/403）
-.github/workflows/  CI：每次 push 跑五套 115 断言（无需 LLM key）
+.github/workflows/  CI：每次 push 跑五套 120 断言（无需 LLM key）
 证据/               WorkBuddy 聊天截图 12 张 + 本机演示截图 8 张 + 封面图
 sample_docs/        Meridian Pay 语料 14 篇（public/internal/gtm/compliance/risk/card_ops/finance，虚构数据）
 ```

@@ -122,6 +122,8 @@ class WebConfig:
     # 请求限流 (公开 live URL 保护): 问答/反馈 每身份每分钟上限; 登录尝试按 IP 限流防爆破
     rate_limit_per_min: int = 60
     login_rate_limit_per_min: int = 10
+    # 数据新鲜度: >0 时后台每 N 分钟自动重扫语料 (有界窗口), 0 = 仅手动 /api/resync
+    resync_minutes: int = 0
 
     @classmethod
     def from_env(cls) -> "WebConfig":
@@ -141,6 +143,7 @@ class WebConfig:
             auth_mode="anonymous" if mode == "anonymous" else "token",
             rate_limit_per_min=int(os.getenv("KB_RATE_LIMIT", "60")),
             login_rate_limit_per_min=int(os.getenv("KB_LOGIN_RATE_LIMIT", "10")),
+            resync_minutes=int(os.getenv("KB_RESYNC_MINUTES", "0")),
         )
 
     def to_kb_config(self) -> Config:
@@ -347,6 +350,8 @@ class KBHandler(BaseHTTPRequestHandler):
             self._handle_ask()
         elif path == "/api/feedback":
             self._handle_feedback()
+        elif path == "/api/resync":
+            self._handle_resync()
         else:
             self._send_error_json(404, f"未知路径: {path}")
 
@@ -386,7 +391,27 @@ class KBHandler(BaseHTTPRequestHandler):
             "workflow_names": {w.id: w.name for w in WORKFLOWS.values()},    # 展示名映射
             "auth_mode": "token" if self._auth_enabled() else "anonymous",   # 是否需要登录
             "demo_accounts": sorted(self.directory.accounts) if self.directory else [],
+            "last_ingest_ts": kb.last_ingest_ts,
+            "resync_minutes": self.web_cfg.resync_minutes,
             "ts": _now_iso(),
+        })
+
+    def _handle_resync(self) -> None:
+        """重新摄入文档并重建索引 (admin only) — 数据新鲜度的手动窗口。"""
+        if self._auth_enabled():
+            acct = self._require_account()
+            if acct is None:
+                return                                   # 已写 401
+            if acct.role != "admin":
+                self._send_error_json(403, "重扫仅 admin 可用")
+                return
+        self.kb.rescan()
+        docs = sorted({c.path for c in self.kb.chunks})
+        self._send_json(200, {
+            "status": "ok",
+            "chunks": len(self.kb.chunks),
+            "documents": len(docs),
+            "last_ingest_ts": self.kb.last_ingest_ts,
         })
 
     # ---- 登录 / 登出 ----
@@ -635,6 +660,7 @@ class KBHandler(BaseHTTPRequestHandler):
                     "title": s["title"],
                     "score": round(float(s["score"]), 3),        # 前端展示 3 位小数
                     "source": s.get("source") or "Confluence",   # 来源平台 (Confluence/Drive/Jira)
+                    "mtime": s.get("mtime"),                     # 文档更新时间 (新鲜度展示)
                 }
                 for s in sources
             ],
@@ -733,6 +759,22 @@ def main(argv: list[str] | None = None) -> int:
 
     httpd = KBQAHTTPServer((cfg.host, cfg.port), KBHandler, kb=kb, web_cfg=cfg,
                            directory=directory)
+
+    # 新鲜度有界窗口: KB_RESYNC_MINUTES > 0 时后台定时重扫语料
+    if cfg.resync_minutes > 0:
+        def _periodic_resync() -> None:
+            while True:
+                time.sleep(cfg.resync_minutes * 60)
+                try:
+                    kb.rescan()
+                    print(f"[重扫] {kb.last_ingest_ts} 完成: "
+                          f"{len(kb.chunks)} 分块 / {len({c.path for c in kb.chunks})} 文档", flush=True)
+                except Exception as e:  # 重扫失败不影响服务, 下个周期重试
+                    print(f"[重扫] 失败: {e}", flush=True)
+
+        threading.Thread(target=_periodic_resync, daemon=True, name="resync").start()
+        print(f"[启动] 定时重扫: 每 {cfg.resync_minutes} 分钟")
+
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

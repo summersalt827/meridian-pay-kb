@@ -25,6 +25,7 @@ Web 层验收矩阵 (问题 × 角色) + agent 工作流用例
 
 from __future__ import annotations
 
+import glob
 import json
 import os
 import sys
@@ -256,7 +257,7 @@ def main() -> int:
         failures.append(f"A6 agent=false 忽略 workflow: HTTP {status} 期望 200")
         print(f"  ❌ A6 agent=false 忽略 workflow: HTTP {status} 期望 200")
 
-    # ============ 第三部分: 金融岗位新角色 (10/13 新增, 7 用例) ============
+    # ============ 第三部分: 金融岗位新角色 (10/13 新增, 8 用例) ============
     fin_accounts = {"compliance_officer": "cara", "risk_analyst": "ray",
                     "card_ops": "erin", "finance_analyst": "fay"}
     fin_tokens: dict[str, str] = {}
@@ -290,6 +291,87 @@ def main() -> int:
         else:
             failures.append(f"{role} × {question[:16]} 期望{expect}: {detail}")
             print(f"  ❌ {role} × {question[:16]} 期望{expect}: {detail}")
+
+    # ============ 第四部分: 数据新鲜度 (resync, 10/14 新增, 5 用例) ============
+    # 官方 FinTech 赛道要求: 新内容在分钟~1 小时内可检索, 绝不静默提供过期内容。
+    # worked example: 写探针文档 -> resync -> 新内容可答 (引用带更新时间);
+    #                  删探针文档 -> resync -> 旧内容不再可答。
+    _, health = _request("GET", "/api/health")
+    kb_root = health.get("kb_root") or "sample_docs"
+    probe_rel = f"internal/_resync_probe_{os.getpid()}.md"
+    probe_abs = os.path.join(kb_root, probe_rel)
+    for leftover in glob.glob(os.path.join(kb_root, "internal", "_resync_probe_*.md")):
+        os.unlink(leftover)          # 清理上次异常中断的残留
+
+    # R1: 无令牌 resync -> 401
+    total += 1
+    got, _ = _request("POST", "/api/resync", {})
+    ok = got == 401
+    if ok:
+        passed += 1
+        print(f"  ✅ R1 resync 无令牌: HTTP {got}")
+    else:
+        failures.append(f"R1 resync 无令牌: HTTP {got} 期望 401")
+        print(f"  ❌ R1 resync 无令牌: HTTP {got} 期望 401")
+
+    # R2: viewer resync -> 403
+    total += 1
+    got, _ = _request("POST", "/api/resync", {}, token=tokens["viewer"])
+    ok = got == 403
+    if ok:
+        passed += 1
+        print(f"  ✅ R2 resync viewer: HTTP {got}")
+    else:
+        failures.append(f"R2 resync viewer: HTTP {got} 期望 403")
+        print(f"  ❌ R2 resync viewer: HTTP {got} 期望 403")
+
+    # R3: admin resync -> 200 且索引状态回填
+    total += 1
+    got, data = _request("POST", "/api/resync", {}, token=tokens["admin"])
+    ok = (got == 200 and data.get("status") == "ok"
+          and int(data.get("chunks", 0)) > 0 and int(data.get("documents", 0)) > 0
+          and data.get("last_ingest_ts"))
+    if ok:
+        passed += 1
+        print(f"  ✅ R3 resync admin: HTTP {got} chunks={data.get('chunks')} "
+              f"docs={data.get('documents')} ts={data.get('last_ingest_ts')}")
+    else:
+        failures.append(f"R3 resync admin: HTTP {got} {data}")
+        print(f"  ❌ R3 resync admin: HTTP {got} {data}")
+
+    try:
+        # R4: 新文档 -> resync -> 可答且引用带更新时间
+        with open(probe_abs, "w", encoding="utf-8") as f:
+            f.write("# 重扫探针\n\n重扫探针是验证数据新鲜度机制的测试文档。\n")
+        _request("POST", "/api/resync", {}, token=tokens["admin"])
+        total += 1
+        status, data = ask("重扫探针是什么？", "admin", tokens["admin"], agent=False)
+        top1 = (data.get("sources") or [{}])[0].get("path", "") if data.get("sources") else ""
+        mtime = (data.get("sources") or [{}])[0].get("mtime")
+        ok = status == 200 and data.get("mode") != "no_context" and top1 == probe_rel and bool(mtime)
+        if ok:
+            passed += 1
+            print(f"  ✅ R4 新文档重扫后可答: mode={data.get('mode')} top1={top1} mtime={mtime}")
+        else:
+            failures.append(f"R4 新文档重扫后可答: mode={data.get('mode')} top1={top1} mtime={mtime}")
+            print(f"  ❌ R4 新文档重扫后可答: mode={data.get('mode')} top1={top1} mtime={mtime}")
+
+        # R5: 删文档 -> resync -> 旧内容不再可答
+        os.unlink(probe_abs)
+        _request("POST", "/api/resync", {}, token=tokens["admin"])
+        total += 1
+        status, data = ask("重扫探针是什么？", "admin", tokens["admin"], agent=False)
+        ok = status == 200 and data.get("mode") == "no_context" and not data.get("sources")
+        if ok:
+            passed += 1
+            print(f"  ✅ R5 删除后重扫不可答: mode={data.get('mode')}")
+        else:
+            failures.append(f"R5 删除后重扫不可答: mode={data.get('mode')} sources={data.get('sources')}")
+            print(f"  ❌ R5 删除后重扫不可答: mode={data.get('mode')} sources={data.get('sources')}")
+    finally:
+        if os.path.exists(probe_abs):
+            os.unlink(probe_abs)
+        _request("POST", "/api/resync", {}, token=tokens["admin"])   # 恢复索引到原状态
 
     print(f"\n== 结果: {passed}/{total} 通过")
     if failures:

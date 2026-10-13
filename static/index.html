@@ -277,6 +277,7 @@
   .src .idx { color: #475569; flex: 0 0 18px; }
   .src .ref { flex: 1 1 auto; min-width: 0; }
   .src .path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--blue); }
+  .src .upd { font-size: 10px; color: var(--muted); margin-left: 6px; font-family: inherit; }
   .src .title { color: var(--muted); }
   .src .score {
     flex: 0 0 auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -777,12 +778,17 @@
     } else {
       list.forEach(function (s, i) {
         var plat = s.source || "Confluence";
+        var upd = s.mtime
+          ? '<span class="upd">更新于 ' +
+            new Date(s.mtime * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}) +
+            '</span>'
+          : "";
         var item = document.createElement("div");
         item.className = "src";
         item.innerHTML =
           '<span class="idx">' + (i + 1) + '.</span>' +
           '<span class="ref"><span class="plat ' + esc(plat) + '">' + esc(plat) + '</span>' +
-          '<span class="path">' + esc(s.path) + '</span>' +
+          '<span class="path">' + esc(s.path) + upd + '</span>' +
           '<span class="title"> :: ' + esc(s.title) + '</span></span>' +
           '<span class="score">' + Number(s.score).toFixed(3) + '</span>';
         box.appendChild(item);

@@ -122,12 +122,16 @@ class Answer:
 
 def _source_dict(chunk: Chunk, score: float) -> dict:
     """统一构造来源字典: 新增 source(平台) 字段, 缺省回落默认平台, 向后兼容。"""
-    return {
+    out = {
         "path": chunk.path,
         "title": chunk.title,
         "score": round(float(score), 4),
         "source": getattr(chunk, "doc_source", DEFAULT_DOC_SOURCE),
     }
+    mtime = chunk.meta.get("mtime")
+    if mtime:
+        out["mtime"] = mtime
+    return out
 
 # ============================================================
 # 配置
@@ -144,8 +148,8 @@ class Config:
     # 相关性阈值 (relevance 口径, 0~1 绝对可比): 低于此分视为噪声, 直接丢弃;
     # RBAC 过滤后若无任何来源过门则判 no_context, 杜绝低分文档凑数。
     # 0.17 由 27 组标注样本实测标定, 三类恰好完全分离:
-    #   语料有答案的提问  最低 0.189 (「折扣规则是什么」→ 命中定价折扣章节)
-    #   语料只沾一两句的  最高 0.152 (「打印机坏了找谁修」→ 判无命中可接受)
+    #   语料有答案的提问  最低 0.2464 (「折扣规则是什么」→ 命中定价折扣章节)
+    #   语料只沾一两句的  最高 0.1492 (「打印机坏了找谁修」→ 判无命中可接受)
     #   语料完全无关的    最高 0.145 (「今天天气怎么样」)
     # 取 0.152 与 0.189 的几何中点。改这个值前请重跑 test_relevance.py。
     min_score: float = 0.17
@@ -333,12 +337,13 @@ class MarkdownIngestor:
             rel = str(md.relative_to(root)).replace("\\", "/")
             try:
                 text = md.read_text(encoding="utf-8")
+                mtime = md.stat().st_mtime
             except Exception:
                 continue
-            chunks.extend(self._chunk(text, rel))
+            chunks.extend(self._chunk(text, rel, mtime))
         return chunks
 
-    def _chunk(self, text: str, rel_path: str) -> list[Chunk]:
+    def _chunk(self, text: str, rel_path: str, mtime: float = 0.0) -> list[Chunk]:
         sections = self._split_by_headers(text)
         doc_id = hashlib.md5(rel_path.encode()).hexdigest()[:10]
         doc_source = doc_source_for(rel_path)     # 平台名来自代码常量, 不读文档正文
@@ -353,7 +358,8 @@ class MarkdownIngestor:
                 content = (header_ctx + "\n" + piece) if header_ctx else piece
                 out.append(Chunk(
                     doc_id=doc_id, path=rel_path, title=title,
-                    content=content, meta={"header": header_ctx},
+                    content=content,
+                    meta={"header": header_ctx, "mtime": mtime},
                     doc_source=doc_source,
                 ))
         return out
@@ -1207,6 +1213,7 @@ class KnowledgeBase:
         self.generator = Generator(self.cfg)
         self.audit = AuditLog(self.cfg.db_path)
         self._built = False
+        self.last_ingest_ts: str | None = None
 
     def build(self) -> None:
         """摄入文档并构建索引。"""
@@ -1228,6 +1235,14 @@ class KnowledgeBase:
             min_score=self.cfg.min_score, candidate_pool=self.cfg.candidate_pool,
         )
         self._built = True
+        self.last_ingest_ts = _now_iso()
+
+    def rescan(self) -> None:
+        """重新摄入文档并重建索引 (数据新鲜度的有界窗口实现)。
+
+        引用交换是单次属性赋值, 进行中的请求最多用到旧索引, 不会读到半构建状态。
+        """
+        self.build()
 
     # ---- 单跳 (保持原行为不变) ----
 
