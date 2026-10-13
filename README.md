@@ -1,5 +1,7 @@
 # Meridian Pay 知识大脑 (KB-QA Agent Platform)
 
+![tests](https://github.com/summersalt827/meridian-pay-kb/actions/workflows/tests.yml/badge.svg)
+
 腾讯云 AI CAN DO IT Hackathon 2026 · FinTech 赛道（Aspire 出题）
 **Enterprise Agent Builder & Autonomous Operations Platform** — 演示场景 ② Internal Knowledge Brain
 
@@ -44,7 +46,23 @@
 - 查询规划块（子问题可视化）、耗时、来源引用 + 平台徽章（Confluence/Drive/Jira，代码常量映射）
 - no_context 设计化拒绝卡片：「证据不足 · 已拒绝回答」——宁可拒绝，不给没有依据的答案
 
-## 评测（四套，81 断言 — 2026-10-13 全绿）
+## 架构与信任边界
+
+LLM 在边缘（规划、合成），确定性代码在核心（鉴权、RBAC、检索、相关性门、审计）。
+**LLM 无任何写路径，也永远看不到没过 RBAC 和相关性门的 chunk。** 完整版见
+[`docs/architecture.md`](docs/architecture.md)。
+
+```mermaid
+flowchart LR
+  H["人 · 登录 / 提问 / 投票"] --> API["web_ui.py<br/>鉴权 401/403 · 限流"]
+  API --> PLAN["规划 LLM<br/>拆解子问题"] --> RBAC["RBAC<br/>子问题级"] --> RET["混合检索<br/>BM25+TF-IDF"] --> GATE["相关性门 0.17"] --> MERGE["合并去重"] --> SYNTH["合成 LLM<br/>带引用 / 简报+需人工决策"] --> API --> H
+  RET --> DOCS[("sample_docs 8 篇<br/>public/internal/gtm")]
+  API --> DB[("SQLite WAL<br/>审计 + 反馈")]
+```
+
+> 演示语料 `sample_docs/` 为虚构 Meridian Pay（B2B fintech）数据，角色、文档与审计记录均为演示用途（honest simulation）。
+
+## 评测（五套，107 断言 — 2026-10-13 全绿）
 
 | 套件 | 用例 | 断言 | 结果 | 关键数字 |
 |------|------|------|------|----------|
@@ -52,8 +70,11 @@
 | test_relevance.py | 21 | 无关必 no_context + 正样本必命中 + 分数可分性（0.17 标定） | 21/21 ✅ | 无关最高 0.1519 < 0.17 < 命中最低 0.2469（余量 1.12x / 1.45x） |
 | test_auth.py | 23 | 认证攻击面：无令牌/伪造角色/篡改 payload/登出吊销/越权入口 | 23/23 ✅ | 23 攻击面用例全绿 |
 | test_web_matrix.py | 29 | 18 组角色矩阵 + 审计权限 + agent 工作流用例 | 29/29 ✅ | 18 组角色矩阵全绿 |
+| test_redteam.py | 26 | **红队对抗**：语义改写 8 + 提示注入 4 + 路径逃逸 2 + 角色伪造 4 + 多跳拼图泄漏 3 + 阈值压制 2 + 反作弊回归 3 | 26/26 ✅ | **26 种攻击零泄漏**（报告见 [RED-TEAM-REPORT](docs/RED-TEAM-REPORT.md)） |
 
 评测轴对齐行业框架：0 role violations、0 PII leaks、faithfulness 100%（0 幻觉引用）。
+
+实测延迟（本机 → DeepSeek chat，12 次实测，2026-10-13）：**中位 1038ms · p90 1202ms**（全链路含 LLM 调用）。
 
 ## 构建方式（WorkBuddy）
 
@@ -114,9 +135,14 @@ test_rbac.py        金标准评测（leak=0 + recall=100%）
 test_relevance.py   相关性门标定评测（21 用例）
 test_auth.py        认证攻击面评测（23 用例，自起服务）
 test_web_matrix.py  Web 层矩阵（29 用例）
+test_redteam.py     红队对抗套件（26 项攻击检查，零泄漏）
 docs/requirements-map.md  需求映射表（Aspire brief → 机制 → 证据 + 评审维度对照）
+docs/architecture.md  架构与信任边界（mermaid 流水线 + 三区职责表）
+docs/RED-TEAM-REPORT.md  红队报告（攻击矩阵 + 每组的"为什么"）
 docs/AI-COLLABORATION.md  AI 协作分工叙事（WorkBuddy 主构建 + Claude Code 合并验证）
 docs/build-sessions/  WorkBuddy 会话①-⑤ prompt 全文 + 9/26 试跑对话记录
+scripts/demo_path.py  demo 路径 e2e 证明（三角色命中/拦截/审计/401/403）
+.github/workflows/  CI：每次 push 跑五套 107 断言（无需 LLM key）
 证据/               WorkBuddy 聊天截图 12 张 + 本机演示截图 8 张 + 封面图
 sample_docs/        Meridian Pay 语料 8 篇（public/internal/gtm，虚构数据）
 ```
