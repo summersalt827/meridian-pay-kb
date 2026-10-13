@@ -89,12 +89,12 @@ Claude Code 负责补丁合并、四套评测质量门与 UI 打磨——完整�
 
 ## 谁在用（persona）
 
-| Persona | 需求 | 我们的回答 |
+| Persona（Aspire 业务语境） | 需求 | 我们的回答 |
 |---|---|---|
-| 合规/内审（alice · admin） | 「谁问了什么、答了什么、基于哪篇文档」可追溯 | 审计抽屉 + SQLite 全量审计（MAS FEAT accountability 证据） |
-| 销售（sam · sales） | 快速拿折扣/案例/ICP 规则；碰敏感数据被干净拦截 | 子问题级 RBAC：命中所属目录，越权拿 no_context |
-| 新员工/外部协作者（bob · viewer） | 只读公开手册 | 目录级白名单：public only |
-| GTM 团队 | 单客户调研 2-3 小时 → 30 秒 | gtm_research 账户情报简报（评分卡/路由/首触邮件草稿/需人工决策清单） |
+| 合规/内审（alice · admin） | 查资金结算 SOP 与 MAS/PDPA 合规要求；「谁问了什么、答了什么、基于哪篇文档」可追溯 | 审计抽屉 + SQLite 全量审计（MAS FEAT accountability 证据 + Notice 626 STR-readiness 文档） |
+| 销售/客户经理（sam · sales） | 快速拿折扣治理/案例/ICP 规则；碰薪酬等敏感数据被干净拦截 | 子问题级 RBAC：命中所属目录，越权拿 no_context |
+| 新员工/外部协作者（bob · viewer） | 只读入职指南与报销 FAQ | 目录级白名单：public only |
+| GTM 团队 | 单客户调研 2-3 小时 → 30 秒（brief 的 GTM Engineering workflow） | gtm_research 账户情报简报（评分卡/ICP 路由/首触邮件草稿/需人工决策清单） |
 
 ## 市面上有什么（what's out there）
 
