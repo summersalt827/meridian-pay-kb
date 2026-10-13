@@ -24,7 +24,7 @@ Each session ran as one full prompt in WorkBuddy's sandbox; its patches were bro
 - UI polish: Aspire purple-red brand system, planning block, designed no-context card
 - Docs and README
 
-**Test growth across the build:** 9 tests at the foundation run (9/26) → 120 assertions across five suites incl. the 26-check red team suite, 8 fintech-role matrix cases and 5 data-freshness (resync) cases (10/13). CI runs all five suites on every push.
+**Test growth across the build:** 9 tests at the foundation run (9/26) → 128 assertions across six suites incl. the 26-check red team suite, 8 fintech-role matrix cases, 5 data-freshness (resync) cases and the audit hash-chain suite (append-only triggers + SHA-256 tamper detection) (10/14). CI runs all six suites on every push.
 
 ## Proof checklist (Handbook §7)
 

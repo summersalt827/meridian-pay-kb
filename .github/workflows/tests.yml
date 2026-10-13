@@ -36,3 +36,5 @@ jobs:
         run: python3 test_web_matrix.py
       - name: Red team (26 adversarial checks)
         run: python3 test_redteam.py
+      - name: Audit hash chain
+        run: python3 test_audit_chain.py

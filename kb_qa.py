@@ -1096,6 +1096,22 @@ class AuditLog:
         conn.execute("PRAGMA busy_timeout=5000")
         return conn
 
+    CHAIN_GENESIS = "meridian-audit-genesis-v1"
+
+    @staticmethod
+    def _chain_canonical(ts: str, user: str, role: str, question: str,
+                         source_docs: str, answer: str | None,
+                         answer_mode: str | None) -> str:
+        """哈希链的规范序列化: 与 verify() 逐字节一致是防篡改成立的前提。"""
+        return json.dumps(
+            [ts, user, role, question, source_docs, answer, answer_mode],
+            ensure_ascii=False, separators=(",", ":"),
+        )
+
+    @staticmethod
+    def _chain_next(prev: str, canonical: str) -> str:
+        return hashlib.sha256((prev + "\n" + canonical).encode("utf-8")).hexdigest()
+
     def _init(self):
         with self._conn() as conn:
             conn.execute("""
@@ -1109,6 +1125,29 @@ class AuditLog:
                     answer TEXT,
                     answer_mode TEXT
                 )
+            """)
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(audit_log)").fetchall()]
+            if "chain_hash" not in cols:
+                # 迁移: 补链哈希列并对历史行回填 (必须先于防篡改触发器)
+                conn.execute("ALTER TABLE audit_log ADD COLUMN chain_hash TEXT")
+                prev = self.CHAIN_GENESIS
+                for row in conn.execute(
+                    "SELECT id, ts, user, role, question, source_docs, answer, answer_mode "
+                    "FROM audit_log ORDER BY id"
+                ).fetchall():
+                    h = self._chain_next(prev, self._chain_canonical(*row[1:]))
+                    conn.execute("UPDATE audit_log SET chain_hash=? WHERE id=?", (h, row[0]))
+                    prev = h
+            # append-only 触发器: 应用自身的数据库连接也无法 UPDATE/DELETE 审计行
+            conn.execute("""
+                CREATE TRIGGER IF NOT EXISTS audit_no_update
+                BEFORE UPDATE ON audit_log
+                BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END
+            """)
+            conn.execute("""
+                CREATE TRIGGER IF NOT EXISTS audit_no_delete
+                BEFORE DELETE ON audit_log
+                BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END
             """)
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS feedback (
@@ -1129,11 +1168,21 @@ class AuditLog:
               "doc_id": c.doc_id} for c, s in sources],
             ensure_ascii=False,
         )
+        canonical = self._chain_canonical(
+            ts, user.username, user.role, question, src_json, answer, mode)
         with self._conn() as conn:
+            # BEGIN IMMEDIATE 串行化「读链尾 → 插入」, 防止并发写入造成链分叉
+            conn.execute("BEGIN IMMEDIATE")
+            prev = conn.execute(
+                "SELECT chain_hash FROM audit_log ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            prev = prev[0] if prev and prev[0] else self.CHAIN_GENESIS
+            chain_hash = self._chain_next(prev, canonical)
             conn.execute(
-                "INSERT INTO audit_log(ts, user, role, question, source_docs, answer, answer_mode) "
-                "VALUES(?,?,?,?,?,?,?)",
-                (ts, user.username, user.role, question, src_json, answer, mode),
+                "INSERT INTO audit_log(ts, user, role, question, source_docs, "
+                "answer, answer_mode, chain_hash) VALUES(?,?,?,?,?,?,?,?)",
+                (ts, user.username, user.role, question, src_json, answer,
+                 mode, chain_hash),
             )
 
     def recent(self, limit: int = 20) -> list[dict]:
@@ -1192,6 +1241,26 @@ class AuditLog:
             "by_user": {str(k): int(v) for k, v in by_user.items()},
             "top_docs": [{"path": p, "hits": h} for p, h in top_docs],
         }
+
+    def verify(self) -> dict:
+        """重算整条哈希链: 审计防篡改的测量证明 (FinTech 能力⑥ worked example)。
+
+        任何一行被改动 (即使先绕过触发器), 其后的链哈希必然断裂;
+        broken_at 指向第一个被改动的行。空库视为完整。
+        """
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT id, ts, user, role, question, source_docs, answer, "
+                "answer_mode, chain_hash FROM audit_log ORDER BY id"
+            ).fetchall()
+        prev = self.CHAIN_GENESIS
+        for row in rows:
+            expected = self._chain_next(prev, self._chain_canonical(*row[1:8]))
+            if row[8] != expected:
+                return {"ok": False, "rows": len(rows), "broken_at": row[0]}
+            prev = expected
+        return {"ok": True, "rows": len(rows), "broken_at": None}
+
 
 def _now_iso() -> str:
     import datetime

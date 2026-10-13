@@ -261,6 +261,9 @@
   .vote-btn:disabled { opacity: .55; cursor: default; }
   .vote-btn.voted { border-color: var(--blue); color: var(--blue); }
   .audit-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .chain-status { margin-bottom: 10px; font-size: 12.5px; padding: 6px 10px; border-radius: 8px; }
+  .chain-ok   { background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
+  .chain-bad  { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; }
   .stat { font-size: 11.5px; padding: 3px 8px; border-radius: 6px; background: #F5F3FF; color: #4C1D95; }
   .obs { font-size: 11px; color: #475569; margin-bottom: 8px; }
 
@@ -470,11 +473,13 @@
       <h3>审计日志</h3>
       <span class="sub" id="auditSub">最近 20 条问答记录</span>
       <div class="acts">
+        <button class="ghost-btn" id="verifyBtn">验证链</button>
         <button class="ghost-btn" id="refreshBtn">刷新</button>
         <button class="close-btn" id="closeBtn" aria-label="关闭">×</button>
       </div>
     </div>
     <div class="drawer-body">
+      <div class="chain-status" id="chainStatus" hidden></div>
       <div class="audit-stats" id="auditStats"></div>
       <table class="audit">
         <thead>
@@ -519,6 +524,8 @@
   var auditStats = document.getElementById("auditStats");
   var auditSub   = document.getElementById("auditSub");
   var refreshBtn = document.getElementById("refreshBtn");
+  var verifyBtn  = document.getElementById("verifyBtn");
+  var chainStatus = document.getElementById("chainStatus");
   var closeBtn   = document.getElementById("closeBtn");
   var segEl      = document.getElementById("seg");
   var segFootEl  = document.getElementById("segFoot");
@@ -1076,11 +1083,35 @@
       });
   }
 
-  function openAudit() { maskEl.hidden = false; loadAudit(); }
+  function openAudit() { maskEl.hidden = false; chainStatus.hidden = true; loadAudit(); }
   function closeAudit() { maskEl.hidden = true; }
 
   auditBtn.addEventListener("click", openAudit);
   refreshBtn.addEventListener("click", loadAudit);
+  verifyBtn.addEventListener("click", function () {
+    fetch("/api/audit/verify", { headers: authHeaders({}) })
+      .then(function (resp) {
+        return resp.json().then(function (d) { return { ok: resp.ok, status: resp.status, data: d }; });
+      })
+      .then(function (res) {
+        chainStatus.hidden = false;
+        if (res.status === 401) { onUnauthorized(res.data && res.data.error); return; }
+        if (res.status === 200 && res.data.ok) {
+          chainStatus.className = "chain-status chain-ok";
+          chainStatus.textContent = "✓ 审计链完整 · " + res.data.rows + " 条记录全部可验证（SHA-256 逐条重算）";
+        } else {
+          chainStatus.className = "chain-status chain-bad";
+          chainStatus.textContent = (res.status === 403)
+            ? "无权验证审计链（仅 admin）"
+            : "✗ 审计链断裂 @ 第 " + (res.data && res.data.broken_at) + " 行（共 " + (res.data && res.data.rows) + " 条）";
+        }
+      })
+      .catch(function () {
+        chainStatus.hidden = false;
+        chainStatus.className = "chain-status chain-bad";
+        chainStatus.textContent = "验证请求失败";
+      });
+  });
   closeBtn.addEventListener("click", closeAudit);
   maskEl.addEventListener("mousedown", function (e) {
     if (!drawerEl.contains(e.target)) closeAudit();   // 点击遮罩关闭

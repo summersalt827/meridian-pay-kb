@@ -335,6 +335,8 @@ class KBHandler(BaseHTTPRequestHandler):
             self._handle_health()
         elif path == "/api/audit":
             self._handle_audit(urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query))
+        elif path == "/api/audit/verify":
+            self._handle_audit_verify(urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query))
         elif path.startswith("/static/"):
             self._handle_static(path[len("/static/"):])
         else:
@@ -566,6 +568,30 @@ class KBHandler(BaseHTTPRequestHandler):
             "feedback": self.kb.audit.feedback_stats(),  # 反馈闭环聚合
             "ts": _now_iso(),
         })
+
+    def _handle_audit_verify(self, query: dict[str, list[str]]) -> None:
+        """审计链验证接口: 仅 admin 可用, 重算哈希链返回完整性结论。"""
+        if self._auth_enabled():
+            acct = self._require_account()
+            if acct is None:
+                return                                   # 已写 401
+            if acct.role != "admin":
+                self._send_error_json(403, "审计链验证仅 admin 可用")
+                return
+        else:
+            # anonymous 模式: 保留查询串声明方式, 仅供本地演示
+            role = (query.get("role") or [""])[0].strip().lower()
+            if role != "admin":
+                self._send_error_json(403, "审计链验证仅 admin 可用")
+                return
+        try:
+            result = self.kb.audit.verify()
+        except Exception as e:
+            self._send_error_json(500, f"审计链验证失败: {e}")
+            return
+        result["status"] = "ok"
+        result["ts"] = _now_iso()
+        self._send_json(200, result)
 
     @staticmethod
     def _parse_source_docs(raw: str) -> list[dict[str, Any]]:

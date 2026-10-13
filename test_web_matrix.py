@@ -175,6 +175,26 @@ def main() -> int:
         failures.append(f"审计 ?role=admin 无令牌: HTTP {got} 期望 401")
         print(f"  ❌ 审计 ?role=admin 无令牌: HTTP {got} 期望 401")
 
+    # 审计链验证 (能力⑥): admin 重算成功, viewer 403
+    total += 1
+    status, data = _request("GET", "/api/audit/verify", token=tokens["admin"])
+    ok = status == 200 and data.get("ok") is True
+    if ok:
+        passed += 1
+        print(f"  ✅ 审计链 admin: HTTP 200, {data.get('rows')} 条可验证")
+    else:
+        failures.append(f"审计链 admin: HTTP {status} {data}")
+        print(f"  ❌ 审计链 admin: HTTP {status} {data}")
+    total += 1
+    status, data = _request("GET", "/api/audit/verify", token=tokens["viewer"])
+    ok = status == 403
+    if ok:
+        passed += 1
+        print("  ✅ 审计链 viewer: HTTP 403")
+    else:
+        failures.append(f"审计链 viewer: HTTP {status} 期望 403")
+        print(f"  ❌ 审计链 viewer: HTTP {status} 期望 403")
+
     # ============ 第二部分: agent 工作流用例 ============
     # A1: admin 多跳拆解
     total += 1
