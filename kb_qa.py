@@ -67,6 +67,27 @@ def doc_source_for(rel_path: str) -> str:
     return DOC_SOURCES.get(norm, DEFAULT_DOC_SOURCE)
 
 
+# ============================================================
+# 披露分级 (audience): 「客户在场」语境下的第二道权限门
+# ============================================================
+# 与 DOC_SOURCES 同哲学: 分级只存在于代码常量, 不读文档正文的自我声明。
+# 陷阱示例: pricing.md 正文自称「对外报价一律以报价单为准」——那是"对外话术
+# 规则", 不代表文档本身可对外披露, 因此仍为 internal。
+DEFAULT_AUDIENCE = "internal"
+
+AUDIENCES: dict[str, str] = {                 # external = 可对客户/外部披露
+    "public/faq.md": "external",
+    "public/getting-started.md": "external",
+    "gtm/case-studies.md": "external",
+}
+
+
+def audience_for(rel_path: str) -> str:
+    """按相对路径查披露分级; 未登记一律 internal (默认安全)。"""
+    norm = str(rel_path).replace("\\", "/").lstrip("./")
+    return AUDIENCES.get(norm, DEFAULT_AUDIENCE)
+
+
 # 无命中时的统一话术 (单跳与多跳共用)
 NO_CONTEXT_ANSWER = "未检索到相关文档, 无法回答。"
 
@@ -83,6 +104,7 @@ class Chunk:
     content: str         # 分块正文
     meta: dict = field(default_factory=dict)
     doc_source: str = DEFAULT_DOC_SOURCE   # 来源平台名 (仅用于展示, 不参与检索)
+    audience: str = DEFAULT_AUDIENCE       # 披露分级 external/internal (客户在场门用, 不参与检索)
 
     def fingerprint(self) -> str:
         return hashlib.md5(self.content.encode("utf-8")).hexdigest()[:12]
@@ -94,6 +116,7 @@ class User:
     username: str
     role: str                              # 'admin' | 'sales' | 'viewer'
     allowed_dirs: tuple[str, ...] = ()      # 受限角色可访问的目录 (相对 kb_root)
+    external_context: bool = False          # True = 客户在场: 只允许可对外内容进入回答
 
     def can_access(self, rel_path: str) -> bool:
         """RBAC 判定: admin 全通过; 其余需路径位于 allowed_dirs 之下。"""
@@ -106,6 +129,12 @@ class User:
             if norm == d or norm.startswith(d.rstrip("/") + "/"):
                 return True
         return False
+
+    def can_disclose(self, chunk: "Chunk") -> bool:
+        """披露门: 对外语境下仅 audience=external 的分块可通过; 只收窄, 从不放宽。"""
+        if not self.external_context:
+            return True
+        return chunk.audience == "external"
 
 
 @dataclass
@@ -127,6 +156,7 @@ def _source_dict(chunk: Chunk, score: float) -> dict:
         "title": chunk.title,
         "score": round(float(score), 4),
         "source": getattr(chunk, "doc_source", DEFAULT_DOC_SOURCE),
+        "audience": getattr(chunk, "audience", DEFAULT_AUDIENCE),
     }
     mtime = chunk.meta.get("mtime")
     if mtime:
@@ -347,6 +377,7 @@ class MarkdownIngestor:
         sections = self._split_by_headers(text)
         doc_id = hashlib.md5(rel_path.encode()).hexdigest()[:10]
         doc_source = doc_source_for(rel_path)     # 平台名来自代码常量, 不读文档正文
+        audience = audience_for(rel_path)         # 披露分级同样来自代码常量
         out: list[Chunk] = []
         for header_path, body in sections:
             title = " / ".join(header_path) if header_path else rel_path
@@ -361,6 +392,7 @@ class MarkdownIngestor:
                     content=content,
                     meta={"header": header_ctx, "mtime": mtime},
                     doc_source=doc_source,
+                    audience=audience,
                 ))
         return out
 
@@ -699,6 +731,8 @@ class Retriever:
                 continue
             c = self.chunks[i]
             if not user.can_access(c.path):     # 目录级权限在这里生效
+                continue
+            if not user.can_disclose(c):        # 披露门 (客户在场): 逐候选生效, 多跳子问题级自动继承
                 continue
             rel = self.relevance(q_tokens, int(i), ceiling=ceiling, bm25_raw=float(k_scores[i]))
             if rel < self.min_score:            # 低于阈值一律丢弃, 不凑数

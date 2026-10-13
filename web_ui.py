@@ -619,6 +619,8 @@ class KBHandler(BaseHTTPRequestHandler):
         question = str(payload.get("question", "")).strip()
         use_agent = _as_bool(payload.get("agent"), self.web_cfg.default_agent)
         workflow_id = str(payload.get("workflow", DEFAULT_WORKFLOW_ID)).strip() or DEFAULT_WORKFLOW_ID
+        # 客户在场模式: 客户端声明、服务端装配进 User (只收窄披露, 从不改变读权限)
+        external_context = _as_bool(payload.get("external_context"), False)
 
         if not question:
             self._send_error_json(400, "question 不能为空")
@@ -649,7 +651,8 @@ class KBHandler(BaseHTTPRequestHandler):
 
         # 目录白名单由服务端按角色硬编码, 不接受任何客户端输入
         allowed_dirs: tuple[str, ...] = ROLE_ALLOWED_DIRS[role]
-        user = User(username=username, role=role, allowed_dirs=allowed_dirs)
+        user = User(username=username, role=role, allowed_dirs=allowed_dirs,
+                    external_context=external_context)
 
         # 问答按身份限流 (登录态=账号, 匿名=IP): 保护公开 live URL 不被刷爆
         rl_key = f"ask:{username}" if self._auth_enabled() else f"ask_ip:{self.client_address[0]}"
@@ -687,6 +690,7 @@ class KBHandler(BaseHTTPRequestHandler):
                     "score": round(float(s["score"]), 3),        # 前端展示 3 位小数
                     "source": s.get("source") or "Confluence",   # 来源平台 (Confluence/Drive/Jira)
                     "mtime": s.get("mtime"),                     # 文档更新时间 (新鲜度展示)
+                    "audience": s.get("audience") or "internal",  # 披露分级 (客户在场门的前端徽章)
                 }
                 for s in sources
             ],

@@ -38,3 +38,5 @@ jobs:
         run: python3 test_redteam.py
       - name: Audit hash chain
         run: python3 test_audit_chain.py
+      - name: Disclosure gate (customer-present mode)
+        run: python3 test_disclosure.py

@@ -68,7 +68,7 @@ flowchart LR
 
 > 演示语料 `sample_docs/` 为虚构 Meridian Pay（B2B fintech）数据，角色、文档与审计记录均为演示用途（honest simulation）。
 
-## 评测（六套，128 断言 — 2026-10-14 全绿）
+## 评测（七套，139 断言 — 2026-10-14 全绿）
 
 | 套件 | 用例 | 断言 | 结果 | 关键数字 |
 |------|------|------|------|----------|
@@ -78,6 +78,7 @@ flowchart LR
 | test_web_matrix.py | 44 | 18 组角色矩阵 + 审计权限 + agent 工作流用例 + **8 金融岗位用例**（合规/风控/卡运营/财务）+ **5 数据新鲜度用例**（resync 权限 + 重扫 worked example）+ 审计链验证权限 | 44/44 ✅ | 全矩阵全绿 |
 | test_redteam.py | 26 | **红队对抗**：语义改写 8 + 提示注入 4 + 路径逃逸 2 + 角色伪造 4 + 多跳拼图泄漏 3 + 阈值压制 2 + 反作弊回归 3 | 26/26 ✅ | **26 种攻击零泄漏**（报告见 [RED-TEAM-REPORT](docs/RED-TEAM-REPORT.md)） |
 | test_audit_chain.py | 6 | **审计防篡改**：append-only 触发器拦截 UPDATE/DELETE + SHA-256 链重算定位篡改行 + 旧库迁移回填 | 6/6 ✅ | 篡改必被定位（能力⑥ worked example） |
+| test_disclosure.py | 11 | **客户在场披露门**：对外语境零泄漏 + 可对外内容零漏检（防退化）+ 只收窄不放宽 + 多跳子问题级生效 | 11/11 ✅ | 同一问题：内部 4 文档 → 客户在场仅 case-studies |
 
 评测轴对齐行业框架：0 role violations、0 PII leaks、faithfulness 100%（0 幻觉引用）。
 
@@ -130,9 +131,10 @@ Claude Code 负责补丁合并、四套评测质量门与 UI 打磨——完整�
 | 3 | 登出，登录 `sam / meridian-demo`（sales），问**同一问题** | 干净 no_context 拒绝卡（RBAC 拦截特写，全片 wow moment） |
 | 4 | 问「大客户报价折扣能批到几折？」 | 命中 gtm/pricing（sales 权限内） |
 | 5 | 切到「账户情报」工作流，问「计划拓展东南亚，帮我做账户情报分析并给路由建议」 | 规划块拆解 4 个子问题（每个独立过 RBAC）→ 评分卡（信号定义库）/ ICP 路由 / LAARC 异议话术 / 首触邮件草稿 / 需人工决策清单 |
-| 6 | 登回 alice，打开审计抽屉 | 全量留痕：谁问了什么、被拦了什么、基于哪篇文档 |
-| 7 | 进阶：登录 `cara`（合规官）问「可疑交易上报的时限是多少？」→ 命中合规文档；换 `erin`（卡运营）同问 → 拦截 | 金融岗位 × 目录权限矩阵的第二个对比镜头 |
-| 8 | 进阶：改 `sample_docs/` 任一文档后，登录 `alice` 调 `POST /api/resync`，再问同一问题 | 新内容可答，引用卡带「更新于 HH:MM」——官方 worked example「数据新鲜度」 |
+| 6 | 用 sam 勾选底部「客户在场（披露门）」开关，问「客户问我们有没有同类案例，以及能给多少折扣」 | **同一问题：4 个文档来源 → 只剩 case-studies（绿「可对外」徽章）**；橙色 banner + 规划块显示子问题各自过门——内部定价/异议话术被披露门拦下 |
+| 7 | 登回 alice，打开审计抽屉，点「验证链」 | 全量留痕：谁问了什么、被拦了什么、基于哪篇文档；SHA-256 哈希链一键重算验证防篡改 |
+| 8 | 进阶：登录 `cara`（合规官）问「可疑交易上报的时限是多少？」→ 命中合规文档；换 `erin`（卡运营）同问 → 拦截 | 金融岗位 × 目录权限矩阵的第二个对比镜头 |
+| 9 | 进阶：改 `sample_docs/` 任一文档后，登录 `alice` 调 `POST /api/resync`，再问同一问题 | 新内容可答，引用卡带「更新于 HH:MM」——官方 worked example「数据新鲜度」 |
 
 也可一条命令重放全部 8 个场景并截图：`KB_DEMO_URL=<你的URL> python3 screenshot_demo.py`
 
@@ -186,6 +188,7 @@ test_relevance.py   相关性门标定评测（21 用例）
 test_auth.py        认证攻击面评测（23 用例，自起服务）
 test_web_matrix.py  Web 层矩阵（44 用例，含 8 金融岗位 + 5 数据新鲜度 + 审计链验证权限）
 test_audit_chain.py 审计哈希链（append-only 触发器 + 链重算定位篡改）
+test_disclosure.py 客户在场披露门（audience 分级：对外零泄漏 + 零漏检）
 test_redteam.py     红队对抗套件（26 项攻击检查，零泄漏；跑前服务需以 KB_LOGIN_RATE_LIMIT=200 启动）
 docs/requirements-map.md  需求映射表（Aspire brief → 机制 → 证据 + 评审维度对照）
 docs/architecture.md  架构与信任边界（mermaid 流水线 + 三区职责表）
@@ -194,7 +197,7 @@ docs/UX-ACCESSIBILITY-AUDIT.md  无障碍审计（WCAG 2.2 AA 对比度实测 + 
 docs/AI-COLLABORATION.md  AI 协作分工叙事（WorkBuddy 主构建 + Claude Code 合并验证）
 docs/build-sessions/  WorkBuddy 会话①-⑤ prompt 全文 + 9/26 试跑对话记录
 scripts/demo_path.py  demo 路径 e2e 证明（三角色命中/拦截/审计/401/403）
-.github/workflows/  CI：每次 push 跑六套 128 断言（无需 LLM key）
+.github/workflows/  CI：每次 push 跑七套 139 断言（无需 LLM key）
 证据/               WorkBuddy 聊天截图 12 张 + 本机演示截图 8 张 + 封面图
 sample_docs/        Meridian Pay 语料 16 篇（public/internal/gtm/compliance/risk/card_ops/finance；gtm 含 LAARC 异议库+信号定义库，虚构数据）
 ```

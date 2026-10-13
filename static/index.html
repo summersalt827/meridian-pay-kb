@@ -264,6 +264,11 @@
   .chain-status { margin-bottom: 10px; font-size: 12.5px; padding: 6px 10px; border-radius: 8px; }
   .chain-ok   { background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
   .chain-bad  { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; }
+  .badge-ext { background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; font-size: 11px; padding: 1px 7px; border-radius: 999px; }
+  .badge-int { background: #FFF7ED; color: #9A3412; border: 1px solid #FED7AA; font-size: 11px; padding: 1px 7px; border-radius: 999px; }
+  .ext-banner { background: #FFF7ED; color: #9A3412; border: 1px solid #FED7AA; padding: 8px 14px; border-radius: 10px; font-size: 13px; margin: 0 0 8px; }
+  .ext-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: #9A3412; cursor: pointer; user-select: none; font-weight: 600; }
+  .ext-toggle input { accent-color: #EA580C; }
   .stat { font-size: 11.5px; padding: 3px 8px; border-radius: 6px; background: #F5F3FF; color: #4C1D95; }
   .obs { font-size: 11px; color: #475569; margin-bottom: 8px; }
 
@@ -438,6 +443,7 @@
         <div class="hero-feats">
           <span class="feat"><b>✦</b> 多跳 Agent</span>
           <span class="feat"><b>✦</b> 角色权限 RBAC</span>
+          <span class="feat"><b>✦</b> 客户在场披露门</span>
           <span class="feat"><b>✦</b> 审计留痕</span>
         </div>
         <div class="seg-wrap">
@@ -463,7 +469,11 @@
     <textarea id="input" rows="1" placeholder="输入问题，Enter 发送，Shift + Enter 换行"></textarea>
     <button class="send" id="send">发送</button>
   </div>
-  <div class="tip">viewer 仅 <code>public/</code>；sales 增开 <code>gtm/</code>；admin 不限。越权文档会被 RBAC 拦截</div>
+  <div class="ext-banner" id="extBanner" hidden>客户在场模式：仅「可对外」内容进入回答，内部定价与话术已被披露门拦截</div>
+  <div class="tip">
+    <label class="ext-toggle"><input type="checkbox" id="extToggle"> 客户在场（披露门）</label>
+    <span>viewer 仅 <code>public/</code>；sales 增开 <code>gtm/</code>；admin 不限。越权文档会被 RBAC 拦截</span>
+  </div>
 </footer>
 
 <!-- 审计日志抽屉: 仅 admin 可见入口, 数据来自 /api/audit -->
@@ -526,6 +536,9 @@
   var refreshBtn = document.getElementById("refreshBtn");
   var verifyBtn  = document.getElementById("verifyBtn");
   var chainStatus = document.getElementById("chainStatus");
+  var extToggle  = document.getElementById("extToggle");
+  var extBanner  = document.getElementById("extBanner");
+  var externalMode = false;
   var closeBtn   = document.getElementById("closeBtn");
   var segEl      = document.getElementById("seg");
   var segFootEl  = document.getElementById("segFoot");
@@ -785,6 +798,9 @@
     } else {
       list.forEach(function (s, i) {
         var plat = s.source || "Confluence";
+        var aud = s.audience === "external"
+          ? '<span class="badge-ext">可对外</span>'
+          : '<span class="badge-int">仅内部</span>';
         var upd = s.mtime
           ? '<span class="upd">更新于 ' +
             new Date(s.mtime * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}) +
@@ -794,7 +810,7 @@
         item.className = "src";
         item.innerHTML =
           '<span class="idx">' + (i + 1) + '.</span>' +
-          '<span class="ref"><span class="plat ' + esc(plat) + '">' + esc(plat) + '</span>' +
+          '<span class="ref"><span class="plat ' + esc(plat) + '">' + esc(plat) + '</span>' + aud +
           '<span class="path">' + esc(s.path) + upd + '</span>' +
           '<span class="title"> :: ' + esc(s.title) + '</span></span>' +
           '<span class="score">' + Number(s.score).toFixed(3) + '</span>';
@@ -969,7 +985,8 @@
       body: JSON.stringify({
         question: question,
         workflow: currentWf,     // 工作流随分段选择器切换
-        agent: true              // 默认多跳; 回归测试可传 false
+        agent: true,             // 默认多跳; 回归测试可传 false
+        external_context: externalMode   // 客户在场: 披露门只收窄来源, 不改变读权限
       })
     })
       .then(function (resp) {
@@ -994,6 +1011,13 @@
   }
 
   sendBtn.addEventListener("click", function () { send(inputEl.value); });
+  extToggle.addEventListener("change", function () {
+    externalMode = extToggle.checked;
+    extBanner.hidden = !externalMode;
+    inputEl.placeholder = externalMode
+      ? "客户在场：问客户案例/报价口径——内部话术将被披露门拦截"
+      : "输入问题，Enter 发送，Shift + Enter 换行";
+  });
 
   inputEl.addEventListener("keydown", function (e) {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
