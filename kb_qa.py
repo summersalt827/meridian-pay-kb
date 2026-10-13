@@ -191,6 +191,8 @@ class AgentWorkflow:
     plan_prompt: str                            # 规划步 prompt: 拆子问题
     synth_prompt: str                           # 合成步 prompt: 生成带引用答案
     max_sub_questions: int = 4                  # 子问题上限
+    extra_aspects: tuple[str, ...] = ()         # 确定性补全检索词: 无论 LLM 拆题如何都执行,
+                                                # 保证关键语料章节 (如行业速查/跟进节奏) 必进合成上下文
     sub_queries_authoritative: bool = False     # True: 子问题即权威检索语句, 深挖结果按原分合并
                                                 # (不要求「原问题已召回该文档」); 用于有固定维度骨架
                                                 # 的工作流 (如 gtm_research), 客户调研问题本身不含
@@ -232,7 +234,7 @@ WORKFLOWS: dict[str, AgentWorkflow] = {
         plan_prompt=(
             "你是 GTM 调研规划器。按以下四个维度把客户调研请求拆成子问题, 每个维度最多 1 个子问题:\n"
             "1) 信号层判断: 融资、招聘、新市场/新主体等优先级信号;\n"
-            "2) ICP 分层与路由: 客户分层画像与线索路由规则;\n"
+            "2) ICP 分层与路由: 客户分层画像、行业速查、线索路由规则与跟进节奏;\n"
             "3) 套餐与折扣: 推荐套餐、功能边界与折扣审批权限;\n"
             "4) 客户案例与合规边界: 同行业案例、异议处理话术与合规/尽调红线。\n"
             "每个子问题都要能单独拿去检索内部文档, 不要带上客户的完整背景描述。\n"
@@ -263,6 +265,7 @@ WORKFLOWS: dict[str, AgentWorkflow] = {
             "是否需要 CFO 双签、首触邮件是否发送(默认草稿)——agent 完成分析, 决策权留给人。"
         ),
         max_sub_questions=4,
+        extra_aspects=("行业速查表", "跟进节奏", "不追清单"),
         sub_queries_authoritative=True,
         offline_aspects=(
             "客户分层画像与线索路由规则",
@@ -1261,7 +1264,8 @@ class KnowledgeBase:
 
         sub_queries = self._plan_sub_questions(question, user, wf, k)
         merged = self._multi_hop_search(question, sub_queries, user, k,
-                                        authoritative=wf.sub_queries_authoritative)
+                                        authoritative=wf.sub_queries_authoritative,
+                                        extra_queries=wf.extra_aspects)
 
         ts = _now_iso()
         if not merged:
@@ -1322,7 +1326,8 @@ class KnowledgeBase:
         return subs
 
     def _multi_hop_search(self, question: str, sub_queries: list[str], user: User,
-                          k: int, authoritative: bool = False) -> list[tuple[Chunk, float]]:
+                          k: int, authoritative: bool = False,
+                          extra_queries: tuple[str, ...] = ()) -> list[tuple[Chunk, float]]:
         """执行步: 每个子问题独立检索 (RBAC 在 retriever 内逐条生效), 再合并去重。
 
         两种模式都: RBAC 在子问题层级生效; 低于 min_score 的来源在合并时即剔除,
@@ -1347,7 +1352,7 @@ class KnowledgeBase:
         for c, s in base:
             if s >= min_score:
                 best[(c.path, c.title)] = (c, s)
-        for q in sub_queries:
+        for q in list(sub_queries) + list(extra_queries):
             for c, s in self.retriever.search(_rewrite_query(q), user, k):  # type: ignore[union-attr]
                 key = (c.path, c.title)
                 if key in best:
