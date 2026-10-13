@@ -13,4 +13,6 @@ services:
       - key: LLM_API_KEY
         sync: false
       - key: KB_MIN_SCORE
-        value: "0.3"
+        value: "0.17"
+      - key: KB_AUTH_SECRET
+        sync: false
