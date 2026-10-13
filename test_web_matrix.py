@@ -7,7 +7,7 @@ Web 层验收矩阵 (问题 × 角色) + agent 工作流用例
   改造前一致), 断言:
   - 命中场景: mode != no_context 且 top1 路径正确
   - 拦截场景: mode == no_context 且 sources 为空
-另验 /api/audit 权限 (无令牌 401, sales/viewer 403, admin 200) 与 /api/health 三角色。
+另验 /api/audit 权限 (无令牌 401, sales/viewer 403, admin 200) 与 /api/health 七角色。
 
 第二部分: agent 工作流新用例 (10/12 会话④):
   - A1 admin 多跳: 子问题拆解生效 (agent=true, 子问题 > 1)

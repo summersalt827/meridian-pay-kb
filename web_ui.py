@@ -79,8 +79,6 @@ from kb_qa import (  # noqa: E402  (需先补 sys.path)
 # 常量
 # ============================================================
 
-VALID_ROLES: tuple[str, ...] = ("admin", "sales", "viewer")
-
 # 角色 -> 可检索目录 (相对 kb_root); 空元组表示不限制, 由 User.can_access 放行全部
 ROLE_ALLOWED_DIRS: dict[str, tuple[str, ...]] = {
     "admin": (),
@@ -91,6 +89,9 @@ ROLE_ALLOWED_DIRS: dict[str, tuple[str, ...]] = {
     "card_ops": ("public", "card_ops"),
     "finance_analyst": ("public", "finance"),
 }
+
+# 单一事实来源: 合法角色 = 权限表键, 避免两处清单漂移
+VALID_ROLES: tuple[str, ...] = tuple(ROLE_ALLOWED_DIRS.keys())
 
 # 可用工作流 (来自 kb_qa.WORKFLOWS 注册表, 这里只做接口层的白名单)
 VALID_WORKFLOWS: tuple[str, ...] = tuple(WORKFLOWS.keys())

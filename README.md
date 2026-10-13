@@ -72,7 +72,7 @@ flowchart LR
 | 套件 | 用例 | 断言 | 结果 | 关键数字 |
 |------|------|------|------|----------|
 | test_rbac.py | 8 | 金标准：leak rate = 0 + recall 漏检 = 0（成对断言） | 8/8 ✅ | **leak rate = 0 · recall 漏检 = 0** |
-| test_relevance.py | 21 | 无关必 no_context + 正样本必命中 + 分数可分性（0.17 标定） | 21/21 ✅ | 无关最高 0.1519 < 0.17 < 命中最低 0.2469（余量 1.14x / 1.45x） |
+| test_relevance.py | 21 | 无关必 no_context + 正样本必命中 + 分数可分性（0.17 标定） | 21/21 ✅ | 无关最高 0.1492 < 0.17 < 命中最低 0.2464（余量 1.14x / 1.45x） |
 | test_auth.py | 23 | 认证攻击面：无令牌/伪造角色/篡改 payload/登出吊销/越权入口 | 23/23 ✅ | 23 攻击面用例全绿 |
 | test_web_matrix.py | 37 | 18 组角色矩阵 + 审计权限 + agent 工作流用例 + **8 金融岗位用例**（合规/风控/卡运营/财务） | 37/37 ✅ | 全矩阵全绿 |
 | test_redteam.py | 26 | **红队对抗**：语义改写 8 + 提示注入 4 + 路径逃逸 2 + 角色伪造 4 + 多跳拼图泄漏 3 + 阈值压制 2 + 反作弊回归 3 | 26/26 ✅ | **26 种攻击零泄漏**（报告见 [RED-TEAM-REPORT](docs/RED-TEAM-REPORT.md)） |
@@ -182,7 +182,7 @@ test_rbac.py        金标准评测（leak=0 + recall=100%）
 test_relevance.py   相关性门标定评测（21 用例）
 test_auth.py        认证攻击面评测（23 用例，自起服务）
 test_web_matrix.py  Web 层矩阵（37 用例，含 8 个金融岗位矩阵）
-test_redteam.py     红队对抗套件（26 项攻击检查，零泄漏）
+test_redteam.py     红队对抗套件（26 项攻击检查，零泄漏；跑前服务需以 KB_LOGIN_RATE_LIMIT=200 启动）
 docs/requirements-map.md  需求映射表（Aspire brief → 机制 → 证据 + 评审维度对照）
 docs/architecture.md  架构与信任边界（mermaid 流水线 + 三区职责表）
 docs/RED-TEAM-REPORT.md  红队报告（攻击矩阵 + 每组的"为什么"）

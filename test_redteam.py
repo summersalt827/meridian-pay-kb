@@ -14,7 +14,9 @@
 [E] 阈值压制 (2): KB_MIN_SCORE=0 起服务, RBAC 独立于门限仍零泄漏
 [F] 反作弊回归 (3): admin/sales/viewer 各自仍能命中该看的 -> 拦截没牺牲可用性
 
-运行前提: python3 web_ui.py 已在 KB_TEST_BASE (默认 localhost:8000) 运行。
+运行前提: python3 web_ui.py 已在 KB_TEST_BASE (默认 localhost:8000) 运行;
+服务应以 KB_LOGIN_RATE_LIMIT=200 启动, 否则登录限流 429 会污染 [C] 组断言
+(429 ≠ 认证拦截, C 组要求恰为 401)。
 运行: python3 test_redteam.py  (退出码 0=通过, 1=有失败)
 """
 
@@ -155,12 +157,16 @@ def main() -> int:
               f"mode={data.get('mode')} 泄漏={lk or '无'}")
 
     # [C] 角色伪造 — 3 种伪造用户名 + 请求体声明 role
+    # 断言必须恰为 401: 只排除 200 会把「限流 429 未走到认证路径」误计为通过
     for i, fake in enumerate(["ADMIN", "admin ", "root"]):
         status, data = _request("POST", "/api/login",
                                 {"username": fake, "password": DEMO_PASSWORD})
+        detail = (f"HTTP {status} token={'有' if data.get('token') else '无'}"
+                  + (" — 限流误伤? 服务需以 KB_LOGIN_RATE_LIMIT=200 启动"
+                     if status == 429 else ""))
         check(f"[C{i+1}] 伪造用户名登录 {fake!r}",
-              status != 200 or not data.get("token"),
-              f"HTTP {status} token={'有' if data.get('token') else '无'}")
+              status == 401,
+              detail)
     status, data = ask("薪酬带宽是多少？", "viewer", tokens["viewer"],
                        extra={"role": "admin"})
     lk = leaked(data)

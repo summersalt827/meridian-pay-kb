@@ -18,6 +18,7 @@ jobs:
         env:
           KB_AUTH_SECRET: ci-test-secret
           KB_DB: /tmp/ci-kb-audit.db
+          KB_LOGIN_RATE_LIMIT: "200"
         run: |
           python3 web_ui.py --port 8000 > /tmp/web_ui.log 2>&1 &
           for i in $(seq 1 60); do
