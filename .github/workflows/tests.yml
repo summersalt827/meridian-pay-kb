@@ -1,0 +1,37 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Start server (extractive mode, no LLM key needed)
+        env:
+          KB_AUTH_SECRET: ci-test-secret
+          KB_DB: /tmp/ci-kb-audit.db
+        run: |
+          python3 web_ui.py --port 8000 > /tmp/web_ui.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8000/api/health > /dev/null && break
+            sleep 0.5
+          done
+          curl -sf http://localhost:8000/api/health > /dev/null || { cat /tmp/web_ui.log; exit 1; }
+      - name: RBAC gold standard
+        run: python3 test_rbac.py
+      - name: Relevance gate calibration
+        run: python3 test_relevance.py
+      - name: Auth attack surface
+        run: python3 test_auth.py
+      - name: Web matrix
+        run: python3 test_web_matrix.py
+      - name: Red team (26 adversarial checks)
+        run: python3 test_redteam.py
