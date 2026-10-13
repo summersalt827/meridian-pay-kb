@@ -1077,6 +1077,15 @@ class AuditLog:
                     answer_mode TEXT
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS feedback (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts TEXT NOT NULL,
+                    user TEXT NOT NULL,
+                    question TEXT NOT NULL,
+                    vote INTEGER NOT NULL
+                )
+            """)
 
     def log(self, user: User, question: str,
             sources: list[tuple[Chunk, float]], answer: str, mode: str,
@@ -1105,6 +1114,51 @@ class AuditLog:
              "source_docs": r[4], "answer": r[5], "answer_mode": r[6]}
             for r in rows
         ]
+
+    def log_feedback(self, user: User, question: str, vote: int):
+        """点赞/点踩 (1/-1): 运营闭环的反馈入口, 与审计同库。"""
+        with self._conn() as conn:
+            conn.execute(
+                "INSERT INTO feedback(ts, user, question, vote) VALUES(?,?,?,?)",
+                (_now_iso(), user.username, question, int(vote)),
+            )
+
+    def feedback_stats(self) -> dict:
+        """反馈聚合: 总数 + 有用/无用分布。"""
+        with self._conn() as conn:
+            total = conn.execute("SELECT COUNT(*) FROM feedback").fetchone()[0]
+            up = conn.execute("SELECT COUNT(*) FROM feedback WHERE vote=1").fetchone()[0]
+            down = conn.execute("SELECT COUNT(*) FROM feedback WHERE vote=-1").fetchone()[0]
+        return {"total": int(total), "up": int(up), "down": int(down)}
+
+    def stats(self) -> dict:
+        """可观测聚合: 总量 / 模式分布 / 用户分布 / top 文档 (最近 500 条来源内解析)。"""
+        with self._conn() as conn:
+            total = conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0]
+            by_mode = dict(conn.execute(
+                "SELECT answer_mode, COUNT(*) FROM audit_log GROUP BY answer_mode"
+            ).fetchall())
+            by_user = dict(conn.execute(
+                "SELECT user, COUNT(*) FROM audit_log GROUP BY user ORDER BY COUNT(*) DESC"
+            ).fetchall())
+            rows = conn.execute(
+                "SELECT source_docs FROM audit_log ORDER BY id DESC LIMIT 500"
+            ).fetchall()
+        doc_hits: dict[str, int] = {}
+        for (raw,) in rows:
+            try:
+                for s in json.loads(raw):
+                    path = str(s.get("path", "?"))
+                    doc_hits[path] = doc_hits.get(path, 0) + 1
+            except Exception:
+                continue
+        top_docs = sorted(doc_hits.items(), key=lambda p: -p[1])[:3]
+        return {
+            "total": int(total),
+            "by_mode": {str(k): int(v) for k, v in by_mode.items()},
+            "by_user": {str(k): int(v) for k, v in by_user.items()},
+            "top_docs": [{"path": p, "hits": h} for p, h in top_docs],
+        }
 
 def _now_iso() -> str:
     import datetime

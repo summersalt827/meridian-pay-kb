@@ -253,6 +253,15 @@
   .tag.llm        { background: var(--blue-soft);   color: var(--blue);   border: 1px solid #BFDBFE; }
   .tag.extractive { background: var(--orange-soft); color: var(--orange); border: 1px solid #FED7AA; }
   .tag.no_context { background: var(--gray-soft);   color: var(--muted);  border: 1px solid var(--line); }
+  .noctx-card { border: 1px solid var(--line); border-left: 3px solid #F59E0B; background: #FFFBEB; border-radius: 8px; padding: 10px 12px; }
+  .noctx-title { font-weight: 600; color: #92400E; margin-bottom: 4px; }
+  .noctx-text { color: #78350F; font-size: 12.5px; line-height: 1.5; }
+  .vote-row { display: flex; gap: 6px; margin-top: 6px; }
+  .vote-btn { font-size: 11px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--muted); cursor: pointer; }
+  .vote-btn:disabled { opacity: .55; cursor: default; }
+  .vote-btn.voted { border-color: var(--blue); color: var(--blue); }
+  .audit-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .stat { font-size: 11.5px; padding: 3px 8px; border-radius: 6px; background: #F5F3FF; color: #4C1D95; }
   .obs { font-size: 11px; color: #94A3B8; margin-bottom: 8px; }
 
   .sources {
@@ -465,6 +474,7 @@
       </div>
     </div>
     <div class="drawer-body">
+      <div class="audit-stats" id="auditStats"></div>
       <table class="audit">
         <thead>
           <tr>
@@ -505,6 +515,7 @@
   var maskEl     = document.getElementById("mask");
   var drawerEl   = document.getElementById("drawer");
   var auditBody  = document.getElementById("auditBody");
+  var auditStats = document.getElementById("auditStats");
   var auditSub   = document.getElementById("auditSub");
   var refreshBtn = document.getElementById("refreshBtn");
   var closeBtn   = document.getElementById("closeBtn");
@@ -677,15 +688,22 @@
     }
 
     // 正文
+    var mode = data.mode || "no_context";
     var body = document.createElement("div");
-    body.textContent = data.answer || "";
+    if (mode === "no_context") {
+      body.className = "noctx-card";
+      body.innerHTML =
+        '<div class="noctx-title">证据不足 · 已拒绝回答</div>' +
+        '<div class="noctx-text">未检索到可访问的相关文档——可能被 RBAC 权限过滤，或未通过 0.17 相关性门。<br>宁可拒绝，不给没有依据的答案。</div>';
+    } else {
+      body.textContent = data.answer || "";
+    }
     r.bubble.appendChild(body);
 
     // 模式标签 + 工作流 pill
     var meta = document.createElement("div");
     meta.className = "meta";
     var tag = document.createElement("span");
-    var mode = data.mode || "no_context";
     tag.className = "tag " + mode;
     tag.textContent = modeText(mode);
     meta.appendChild(tag);
@@ -702,6 +720,31 @@
       meta.appendChild(ap);
     }
     r.bubble.appendChild(meta);
+
+    // 反馈 (点赞/点踩 -> 运营闭环)
+    if (mode !== "no_context") {
+      var vw = document.createElement("div");
+      vw.className = "vote-row";
+      var up = document.createElement("button");
+      up.className = "vote-btn"; up.textContent = "有用";
+      var down = document.createElement("button");
+      down.className = "vote-btn"; down.textContent = "无用";
+      var submitVote = function (b, vote) {
+        fetch("/api/feedback", {
+          method: "POST",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ question: data.question || "", vote: vote })
+        }).then(function (rr) { return rr.json(); })
+          .then(function () {
+            up.disabled = true; down.disabled = true;
+            b.classList.add("voted");
+          }).catch(function () {});
+      };
+      up.onclick = function () { submitVote(up, 1); };
+      down.onclick = function () { submitVote(down, -1); };
+      vw.appendChild(up); vw.appendChild(down);
+      r.bubble.appendChild(vw);
+    }
 
     // 可观测: 耗时 + 来源数
     var ms = (data.elapsed_ms != null ? data.elapsed_ms : data.latency_ms);
@@ -1004,6 +1047,20 @@
         }
         var recs = (res.data && res.data.records) || [];
         auditSub.textContent = "最近 " + recs.length + " 条问答记录";
+        var st = res.data.stats || {};
+        var fb = res.data.feedback || {};
+        var modeTxt = Object.keys(st.by_mode || {}).map(function (k) {
+          return modeText(k) + " " + st.by_mode[k];
+        }).join(" · ");
+        var topTxt = (st.top_docs || []).map(function (d) {
+          return d.path + " ×" + d.hits;
+        }).join("，");
+        auditStats.innerHTML =
+          '<span class="stat"><b>' + (st.total || 0) + "</b> 总问答</span>" +
+          '<span class="stat">' + esc(modeTxt || "—") + "</span>" +
+          '<span class="stat">活跃用户 ' + Object.keys(st.by_user || {}).length + "</span>" +
+          '<span class="stat">反馈 ' + (fb.total || 0) + "（有用 " + (fb.up || 0) + "）</span>" +
+          (topTxt ? '<span class="stat">Top 文档：' + esc(topTxt) + "</span>" : "");
         renderAudit(recs);
       })
       .catch(function (err) {

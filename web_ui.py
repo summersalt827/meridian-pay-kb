@@ -313,6 +313,8 @@ class KBHandler(BaseHTTPRequestHandler):
             self._handle_logout()
         elif path == "/api/ask":
             self._handle_ask()
+        elif path == "/api/feedback":
+            self._handle_feedback()
         else:
             self._send_error_json(404, f"未知路径: {path}")
 
@@ -406,6 +408,44 @@ class KBHandler(BaseHTTPRequestHandler):
         revoked = directory.revoke(self._bearer_token())
         self._send_json(200, {"status": "ok", "revoked": revoked})
 
+    def _handle_feedback(self) -> None:
+        """点赞/点踩: 任何已登录角色可反馈, 写入 SQLite 反馈表 (运营闭环)。"""
+        try:
+            payload = self._read_json_body()
+        except ValueError as e:
+            self._send_error_json(400, str(e))
+            return
+
+        if self._auth_enabled():
+            acct = self._require_account()
+            if acct is None:
+                return                                   # 已写 401
+            username = acct.username
+        else:
+            username = str(payload.get("username", "")).strip() or "anonymous"
+
+        question = str(payload.get("question", "")).strip()[:500]
+        if not question:
+            self._send_error_json(400, "question 不能为空")
+            return
+        try:
+            vote = int(payload.get("vote", 0))
+        except (TypeError, ValueError):
+            self._send_error_json(400, "vote 必须是 1 或 -1")
+            return
+        if vote not in (1, -1):
+            self._send_error_json(400, "vote 只能是 1 或 -1")
+            return
+
+        user = User(username=username, role="viewer", allowed_dirs=())
+        self.kb.audit.log_feedback(user, question, vote)
+        self._send_json(200, {
+            "status": "ok",
+            "vote": vote,
+            "stats": self.kb.audit.feedback_stats(),
+            "ts": _now_iso(),
+        })
+
     def _handle_audit(self, query: dict[str, list[str]]) -> None:
         """审计日志接口: 仅 admin 可见, 返回最近问答记录 (时间倒序)。
 
@@ -459,6 +499,8 @@ class KBHandler(BaseHTTPRequestHandler):
             "limit": limit,
             "count": len(records),
             "records": records,
+            "stats": self.kb.audit.stats(),             # 可观测聚合 (总量/模式/用户/top 文档)
+            "feedback": self.kb.audit.feedback_stats(),  # 反馈闭环聚合
             "ts": _now_iso(),
         })
 
