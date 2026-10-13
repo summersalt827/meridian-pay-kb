@@ -47,7 +47,7 @@ We demonstrate **two**:
 | Brief workflow | Our demonstration |
 |---|---|
 | **Internal Knowledge Brain** (Confluence/Jira/Slack/Drive + RBAC + audit) | `knowledge_qa` — multi-hop retrieval with sub-question RBAC, source citations, platform badges, no-context rejection card, audit trail. Demo scenario ② as stated in README |
-| **GTM Engineering** (source, enrich, engage, qualify, hand off, feedback loops) | `gtm_research` — account intelligence briefing: signal scoring card (Fit/Timing/Access/Intent → tier → SLA), ICP routing (self-serve/SDR/AE), discount & case-law compliance, first-touch email draft with PDPA/CAN-SPAM notes, human-decisions list; feedback loop via votes |
+| **GTM Engineering** (source, enrich, engage, qualify, hand off, feedback loops) | `gtm_research` — account intelligence briefing: signal scoring card (Fit/Timing/Access/Intent → tier → SLA, backed by a signal library with Definition/Why-predicts-fit/Hook per signal), ICP routing (self-serve/SDR/AE + PARK verdicts), LAARC objection playbook (budget/authority/need/timing), first-touch email draft with PDPA/CAN-SPAM notes, human-decisions list; feedback loop via votes |
 
 ## FinTech 赛道 7 能力 → worked example（官方手册）
 

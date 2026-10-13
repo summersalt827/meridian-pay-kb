@@ -342,10 +342,10 @@ def main() -> int:
     try:
         # R4: 新文档 -> resync -> 可答且引用带更新时间
         with open(probe_abs, "w", encoding="utf-8") as f:
-            f.write("# 重扫探针\n\n重扫探针是验证数据新鲜度机制的测试文档。\n")
+            f.write("# rezprobe\n\nrezprobe 是验证数据新鲜度机制的测试标记。\n")
         _request("POST", "/api/resync", {}, token=tokens["admin"])
         total += 1
-        status, data = ask("重扫探针是什么？", "admin", tokens["admin"], agent=False)
+        status, data = ask("rezprobe 是什么？", "admin", tokens["admin"], agent=False)
         top1 = (data.get("sources") or [{}])[0].get("path", "") if data.get("sources") else ""
         mtime = (data.get("sources") or [{}])[0].get("mtime")
         ok = status == 200 and data.get("mode") != "no_context" and top1 == probe_rel and bool(mtime)
@@ -360,7 +360,7 @@ def main() -> int:
         os.unlink(probe_abs)
         _request("POST", "/api/resync", {}, token=tokens["admin"])
         total += 1
-        status, data = ask("重扫探针是什么？", "admin", tokens["admin"], agent=False)
+        status, data = ask("rezprobe 是什么？", "admin", tokens["admin"], agent=False)
         ok = status == 200 and data.get("mode") == "no_context" and not data.get("sources")
         if ok:
             passed += 1

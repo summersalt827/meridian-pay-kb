@@ -62,7 +62,7 @@ LLM 在边缘（规划、合成），确定性代码在核心（鉴权、RBAC、
 flowchart LR
   H["人 · 登录 / 提问 / 投票"] --> API["web_ui.py<br/>鉴权 401/403 · 限流"]
   API --> PLAN["规划 LLM<br/>拆解子问题"] --> RBAC["RBAC<br/>子问题级"] --> RET["混合检索<br/>BM25+TF-IDF"] --> GATE["相关性门 0.17"] --> MERGE["合并去重"] --> SYNTH["合成 LLM<br/>带引用 / 简报+需人工决策"] --> API --> H
-  RET --> DOCS[("sample_docs 14 篇 / 7 目录<br/>public/internal/gtm/compliance/risk/card_ops/finance")]
+  RET --> DOCS[("sample_docs 16 篇 / 7 目录<br/>public/internal/gtm/compliance/risk/card_ops/finance")]
   API --> DB[("SQLite WAL<br/>审计 + 反馈")]
 ```
 
@@ -128,7 +128,7 @@ Claude Code 负责补丁合并、四套评测质量门与 UI 打磨——完整�
 | 2 | 问「薪酬带宽是多少？」 | 命中 internal/roadmap + 来源引用卡片 + 平台徽章 + 规划块 |
 | 3 | 登出，登录 `sam / meridian-demo`（sales），问**同一问题** | 干净 no_context 拒绝卡（RBAC 拦截特写，全片 wow moment） |
 | 4 | 问「大客户报价折扣能批到几折？」 | 命中 gtm/pricing（sales 权限内） |
-| 5 | 切到「账户情报」工作流，问「计划拓展东南亚，帮我做账户情报分析并给路由建议」 | 规划块拆解 4 个子问题（每个独立过 RBAC）→ 评分卡 / ICP 路由 / 首触邮件草稿 / 需人工决策清单 |
+| 5 | 切到「账户情报」工作流，问「计划拓展东南亚，帮我做账户情报分析并给路由建议」 | 规划块拆解 4 个子问题（每个独立过 RBAC）→ 评分卡（信号定义库）/ ICP 路由 / LAARC 异议话术 / 首触邮件草稿 / 需人工决策清单 |
 | 6 | 登回 alice，打开审计抽屉 | 全量留痕：谁问了什么、被拦了什么、基于哪篇文档 |
 | 7 | 进阶：登录 `cara`（合规官）问「可疑交易上报的时限是多少？」→ 命中合规文档；换 `erin`（卡运营）同问 → 拦截 | 金融岗位 × 目录权限矩阵的第二个对比镜头 |
 | 8 | 进阶：改 `sample_docs/` 任一文档后，登录 `alice` 调 `POST /api/resync`，再问同一问题 | 新内容可答，引用卡带「更新于 HH:MM」——官方 worked example「数据新鲜度」 |
@@ -194,5 +194,5 @@ docs/build-sessions/  WorkBuddy 会话①-⑤ prompt 全文 + 9/26 试跑对话�
 scripts/demo_path.py  demo 路径 e2e 证明（三角色命中/拦截/审计/401/403）
 .github/workflows/  CI：每次 push 跑五套 120 断言（无需 LLM key）
 证据/               WorkBuddy 聊天截图 12 张 + 本机演示截图 8 张 + 封面图
-sample_docs/        Meridian Pay 语料 14 篇（public/internal/gtm/compliance/risk/card_ops/finance，虚构数据）
+sample_docs/        Meridian Pay 语料 16 篇（public/internal/gtm/compliance/risk/card_ops/finance；gtm 含 LAARC 异议库+信号定义库，虚构数据）
 ```
