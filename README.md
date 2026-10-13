@@ -109,7 +109,22 @@ Claude Code 负责补丁合并、四套评测质量门与 UI 打磨——完整�
 
 - **[需求映射表](docs/requirements-map.md)** — Aspire 出题每条要求 → 机制 → 文档 → 可见产物；
   10 个评审维度（10×10 分）→ 证据对照
-- 提交要件：WorkBuddy 证明（会话①-⑤ + 12 张截图，[AI-COLLABORATION.md](docs/AI-COLLABORATION.md)）✅ · blurb 7 词 ✅ · 封面 16:9 380×216 ✅ · 线上 URL（提交前确认）
+- 提交要件：WorkBuddy 证明（会话①-⑤ + 12 张截图，[AI-COLLABORATION.md](docs/AI-COLLABORATION.md)）✅ · blurb 7 词 ✅ · 封面 16:9 380×216 ✅
+
+### 30 秒体验路径（live demo）
+
+> 线上地址：**`https://<your-app>.onrender.com`**（Render 部署后替换此行；本地体验用 `http://localhost:8000`）
+
+| 步 | 操作 | 看到什么 |
+|---|---|---|
+| 1 | 打开地址，登录 `alice / meridian-demo`（admin） | 紫红 hero + 工作流选择器 + 合规徽章 |
+| 2 | 问「薪酬带宽是多少？」 | 命中 internal/roadmap + 来源引用卡片 + 平台徽章 + 规划块 |
+| 3 | 登出，登录 `sam / meridian-demo`（sales），问**同一问题** | 干净 no_context 拒绝卡（RBAC 拦截特写，全片 wow moment） |
+| 4 | 问「大客户报价折扣能批到几折？」 | 命中 gtm/pricing（sales 权限内） |
+| 5 | 切到「账户情报」工作流，问「计划拓展东南亚，帮我做账户情报分析并给路由建议」 | 评分卡 / ICP 路由 / 首触邮件草稿 / 需人工决策清单 |
+| 6 | 登回 alice，打开审计抽屉 | 全量留痕：谁问了什么、被拦了什么、基于哪篇文档 |
+
+也可一条命令重放全部 8 个场景并截图：`KB_DEMO_URL=<你的URL> python3 screenshot_demo.py`
 
 ## 运行
 

@@ -25,7 +25,7 @@ from playwright.sync_api import sync_playwright
 
 BASE_DIR = Path(__file__).resolve().parent
 OUT_DIR = BASE_DIR.parent / "证据"
-URL = "http://localhost:8000/"
+URL = os.getenv("KB_DEMO_URL", "http://localhost:8000/")
 
 
 def answer_count(page, n: int) -> None:
