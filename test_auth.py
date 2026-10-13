@@ -110,6 +110,9 @@ def main() -> int:
         "WEB_PORT": str(PORT),
         "KB_DB": db_path,
         "KB_ROOT": os.path.join(BASE_DIR, "sample_docs"),
+        # 本套件自身登录次数多, 提高限流上限避免自触发 (限流行为另测)
+        "KB_LOGIN_RATE_LIMIT": "1000",
+        "KB_RATE_LIMIT": "1000",
     })
 
     proc = subprocess.Popen(

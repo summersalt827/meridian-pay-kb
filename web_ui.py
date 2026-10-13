@@ -48,6 +48,7 @@ import json
 import mimetypes
 import os
 import sys
+import threading
 import time
 import urllib.parse
 from dataclasses import dataclass, field, replace
@@ -113,6 +114,9 @@ class WebConfig:
     default_agent: bool = True                                             # /api/ask 未传 agent 时的默认行为
     # 鉴权模式: token=需要登录 (默认, 生产必开); anonymous=关闭鉴权, 仅本地演示
     auth_mode: str = "token"
+    # 请求限流 (公开 live URL 保护): 问答/反馈 每身份每分钟上限; 登录尝试按 IP 限流防爆破
+    rate_limit_per_min: int = 60
+    login_rate_limit_per_min: int = 10
 
     @classmethod
     def from_env(cls) -> "WebConfig":
@@ -130,6 +134,8 @@ class WebConfig:
             min_score=float(os.getenv("KB_MIN_SCORE", "0.17")),
             default_agent=_env_bool("KB_AGENT_DEFAULT", True),
             auth_mode="anonymous" if mode == "anonymous" else "token",
+            rate_limit_per_min=int(os.getenv("KB_RATE_LIMIT", "60")),
+            login_rate_limit_per_min=int(os.getenv("KB_LOGIN_RATE_LIMIT", "10")),
         )
 
     def to_kb_config(self) -> Config:
@@ -141,6 +147,26 @@ class WebConfig:
         cfg = Config.from_env()
         return replace(cfg, kb_root=self.kb_root, db_path=self.db_path,
                        top_k=self.top_k, min_score=self.min_score)
+
+
+class RateLimiter:
+    """滑动窗口限流 (内存级, 线程安全; 公开 live URL 的自我保护)。"""
+
+    def __init__(self, window: float = 60.0):
+        self.window = window
+        self._hits: dict[str, list[float]] = {}
+        self._lock = threading.Lock()
+
+    def allow(self, key: str, limit: int) -> bool:
+        now = time.time()
+        with self._lock:
+            hits = [t for t in self._hits.get(key, []) if now - t < self.window]
+            if len(hits) >= limit:
+                self._hits[key] = hits
+                return False
+            hits.append(now)
+            self._hits[key] = hits
+            return True
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -188,6 +214,7 @@ class KBQAHTTPServer(ThreadingHTTPServer):
         self.kb = kb            # 全局共享的知识库实例 (索引只读, 线程安全)
         self.web_cfg = web_cfg
         self.directory = directory   # 账号目录 (鉴权关闭时为 None)
+        self.limiter = RateLimiter()
 
 
 class KBHandler(BaseHTTPRequestHandler):
@@ -377,6 +404,12 @@ class KBHandler(BaseHTTPRequestHandler):
             self._send_error_json(400, "username 与 password 均不能为空")
             return
 
+        # 登录按 IP 限流: PBKDF2 200k 迭代成本高, 防公开环境口令爆破
+        if not self.server.limiter.allow(  # type: ignore[attr-defined]
+                f"login:{self.client_address[0]}", self.web_cfg.login_rate_limit_per_min):
+            self._send_error_json(429, "登录尝试过于频繁, 请稍后再试")
+            return
+
         directory = self.directory
         assert directory is not None
         acct = directory.authenticate(username, password)
@@ -561,6 +594,12 @@ class KBHandler(BaseHTTPRequestHandler):
         # 目录白名单由服务端按角色硬编码, 不接受任何客户端输入
         allowed_dirs: tuple[str, ...] = ROLE_ALLOWED_DIRS[role]
         user = User(username=username, role=role, allowed_dirs=allowed_dirs)
+
+        # 问答按身份限流 (登录态=账号, 匿名=IP): 保护公开 live URL 不被刷爆
+        rl_key = f"ask:{username}" if self._auth_enabled() else f"ask_ip:{self.client_address[0]}"
+        if not self.server.limiter.allow(rl_key, self.web_cfg.rate_limit_per_min):  # type: ignore[attr-defined]
+            self._send_error_json(429, "请求过于频繁, 请稍后再试")
+            return
 
         t0 = time.perf_counter()
         try:
