@@ -38,7 +38,7 @@
 - 身份认证（auth.py，纯标准库）：PBKDF2-HMAC-SHA256 口令哈希（200k 迭代 + 随机 salt）、
   HMAC 签名会话令牌（jti 登出吊销、角色变更即作废、恒定时间比较）、
   未知用户等开销哈希防账号枚举
-- RBAC：目录级权限（admin 全部 / sales public+gtm / viewer 仅 public），
+- RBAC：目录级权限（7 岗位 × 7 目录：admin 全部 / sales public+gtm / viewer public / compliance_officer public+compliance / risk_analyst public+compliance+risk / card_ops public+card_ops / finance_analyst public+finance），
   **子问题层级生效**——越权子问题检索为空；角色只由服务端令牌签发，请求体声明无效
 - 治理：/api/audit 与 /api/ask 身份只认 Bearer 令牌（无令牌 401 / 角色不足 403）
 
@@ -59,7 +59,7 @@ LLM 在边缘（规划、合成），确定性代码在核心（鉴权、RBAC、
 flowchart LR
   H["人 · 登录 / 提问 / 投票"] --> API["web_ui.py<br/>鉴权 401/403 · 限流"]
   API --> PLAN["规划 LLM<br/>拆解子问题"] --> RBAC["RBAC<br/>子问题级"] --> RET["混合检索<br/>BM25+TF-IDF"] --> GATE["相关性门 0.17"] --> MERGE["合并去重"] --> SYNTH["合成 LLM<br/>带引用 / 简报+需人工决策"] --> API --> H
-  RET --> DOCS[("sample_docs 8 篇<br/>public/internal/gtm")]
+  RET --> DOCS[("sample_docs 14 篇<br/>public/internal/gtm/compliance/risk/card_ops/finance")]
   API --> DB[("SQLite WAL<br/>审计 + 反馈")]
 ```
 
@@ -179,7 +179,7 @@ static/index.html   聊天界面（登录/工作流选择器/规划块/平台徽
 test_rbac.py        金标准评测（leak=0 + recall=100%）
 test_relevance.py   相关性门标定评测（21 用例）
 test_auth.py        认证攻击面评测（23 用例，自起服务）
-test_web_matrix.py  Web 层矩阵（29 用例）
+test_web_matrix.py  Web 层矩阵（37 用例，含 8 金融岗位矩阵）
 test_redteam.py     红队对抗套件（26 项攻击检查，零泄漏）
 docs/requirements-map.md  需求映射表（Aspire brief → 机制 → 证据 + 评审维度对照）
 docs/architecture.md  架构与信任边界（mermaid 流水线 + 三区职责表）
@@ -188,7 +188,7 @@ docs/UX-ACCESSIBILITY-AUDIT.md  无障碍审计（WCAG 2.2 AA 对比度实测 + 
 docs/AI-COLLABORATION.md  AI 协作分工叙事（WorkBuddy 主构建 + Claude Code 合并验证）
 docs/build-sessions/  WorkBuddy 会话①-⑤ prompt 全文 + 9/26 试跑对话记录
 scripts/demo_path.py  demo 路径 e2e 证明（三角色命中/拦截/审计/401/403）
-.github/workflows/  CI：每次 push 跑五套 107 断言（无需 LLM key）
+.github/workflows/  CI：每次 push 跑五套 115 断言（无需 LLM key）
 证据/               WorkBuddy 聊天截图 12 张 + 本机演示截图 8 张 + 封面图
 sample_docs/        Meridian Pay 语料 14 篇（public/internal/gtm/compliance/risk/card_ops/finance，虚构数据）
 ```
