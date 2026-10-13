@@ -397,19 +397,20 @@
   </div>
 
   <div class="identity">
-    <div class="field">
+    <!-- 登录前: 用户名 + 口令 -->
+    <div class="field" id="userField">
       <label for="username">用户名</label>
-      <input id="username" type="text" value="admin" autocomplete="off">
+      <input id="username" type="text" value="alice" autocomplete="username">
     </div>
-    <div class="field">
-      <label for="role">角色</label>
-      <select id="role">
-        <option value="admin" selected>admin</option>
-        <option value="sales">sales</option>
-        <option value="viewer">viewer</option>
-      </select>
+    <div class="field" id="passField">
+      <label for="password">口令</label>
+      <input id="password" type="password" autocomplete="current-password"
+             placeholder="演示口令 meridian-demo">
     </div>
-    <span class="role-hint" id="roleHint">admin 可检索全部目录</span>
+    <button class="audit-btn" id="loginBtn">登录</button>
+    <!-- 登录后: 显示服务端下发的身份, 只读 -->
+    <span class="role-hint" id="roleHint" hidden></span>
+    <button class="audit-btn" id="logoutBtn" hidden>退出</button>
     <button class="audit-btn" id="auditBtn" hidden>审计日志</button>
     <span class="health" id="health">索引加载中…</span>
   </div>
@@ -493,7 +494,11 @@
   var inputEl    = document.getElementById("input");
   var sendBtn    = document.getElementById("send");
   var userEl     = document.getElementById("username");
-  var roleEl     = document.getElementById("role");
+  var passEl     = document.getElementById("password");
+  var userField  = document.getElementById("userField");
+  var passField  = document.getElementById("passField");
+  var loginBtn   = document.getElementById("loginBtn");
+  var logoutBtn  = document.getElementById("logoutBtn");
   var hintEl     = document.getElementById("roleHint");
   var healthEl   = document.getElementById("health");
   var auditBtn   = document.getElementById("auditBtn");
@@ -529,9 +534,9 @@
     gtm_research: {
       hint: "GTM 账户情报：按 信号 / ICP 路由 / 套餐 / 案例 四维拆解，输出可下载简报",
       chips: [
-        "一家 400 人、月均 300 笔跨境付款的外贸公司刚完成 B 轮融资、计划拓展东南亚，帮我做账户情报分析并给路由建议"
+        "一家 400 人、月均 300 笔跨境付款的外贸公司刚完成 B 轮融资、计划拓展东南亚；官网已开放自助注册，正在招聘东南亚财务团队，帮我做账户情报分析并给路由建议"
       ],
-      chipHint: "示例参数已确保确定性：400 人 → 企业客户层；月均 300 笔 → AE 直跟；B 轮融资 → 高优先级信号"
+      chipHint: "示例参数已确保确定性：400 人 → 企业客户层；月均 300 笔 → AE 直跟；B 轮融资 → 高优先级信号；自助注册+招聘 = Access/Intent 得分"
     }
   };
   var currentWf = "knowledge_qa";
@@ -789,12 +794,110 @@
     sendBtn.textContent = v ? "处理中" : "发送";
   }
 
+  // ---------- 会话 (令牌) ----------
+  // 角色不再由前端声明: 登录后由服务端下发, 存 sessionStorage, 每请求带 Bearer。
+  var TOKEN_KEY = "mp_kb_token";
+  var session = { token: "", user: "", role: "", display: "" };
+
+  function authHeaders(extra) {
+    var h = { "Content-Type": "application/json" };
+    if (session.token) h["Authorization"] = "Bearer " + session.token;
+    var k;
+    for (k in extra) { if (Object.prototype.hasOwnProperty.call(extra, k)) h[k] = extra[k]; }
+    return h;
+  }
+
+  function setSession(data) {
+    session.token   = data.token || "";
+    session.user    = data.user || "";
+    session.role    = data.role || "";
+    session.display = data.display || session.user;
+    try {
+      if (session.token) sessionStorage.setItem(TOKEN_KEY, JSON.stringify(session));
+      else sessionStorage.removeItem(TOKEN_KEY);
+    } catch (e) { /* 隐私模式下忽略 */ }
+    syncIdentity();
+  }
+
+  function clearSession() {
+    session = { token: "", user: "", role: "", display: "" };
+    try { sessionStorage.removeItem(TOKEN_KEY); } catch (e) {}
+    syncIdentity();
+  }
+
+  function syncIdentity() {
+    var anon = (authMode === "anonymous");
+    var loggedIn = anon || !!session.token;
+    userField.hidden = loggedIn;
+    passField.hidden = loggedIn;
+    loginBtn.hidden  = loggedIn;
+    logoutBtn.hidden = !loggedIn || anon;
+    hintEl.hidden    = !loggedIn;
+    // 审计入口只对 admin 显示 (真正的拦截始终在服务端)
+    auditBtn.hidden  = !(loggedIn && session.role === "admin" && !anon);
+    if (!loggedIn && !maskEl.hidden) closeAudit();
+    if (loggedIn) {
+      hintEl.textContent = anon
+        ? "匿名演示模式（服务端已关闭鉴权）"
+        : session.display + " · " + session.role + " —— " + roleText(session.role);
+    }
+  }
+
+  function onUnauthorized(msg) {
+    clearSession();
+    addError((msg || "登录已失效") + "，请重新登录");
+  }
+
+  function doLogin() {
+    var username = (userEl.value || "").trim();
+    var password = passEl.value || "";
+    if (!username || !password) { hintEl.hidden = false; hintEl.textContent = "请输入用户名与口令"; return; }
+    loginBtn.disabled = true;
+    loginBtn.textContent = "登录中";
+    fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: username, password: password })
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); })
+      .then(function (res) {
+        loginBtn.disabled = false;
+        loginBtn.textContent = "登录";
+        if (!res.ok) {
+          hintEl.hidden = false;
+          hintEl.textContent = (res.data && res.data.error) || "登录失败";
+          return;
+        }
+        passEl.value = "";
+        setSession(res.data);
+        inputEl.focus();
+      })
+      .catch(function (err) {
+        loginBtn.disabled = false;
+        loginBtn.textContent = "登录";
+        hintEl.hidden = false;
+        hintEl.textContent = String(err);
+      });
+  }
+
+  function doLogout() {
+    fetch("/api/logout", { method: "POST", headers: authHeaders({}) })
+      .catch(function () {})
+      .then(function () { clearSession(); });
+  }
+
+  loginBtn.addEventListener("click", doLogin);
+  logoutBtn.addEventListener("click", doLogout);
+  passEl.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); doLogin(); }
+  });
+
   function send(question) {
     question = (question || "").trim();
     if (!question || busy) return;
 
-    var username = (userEl.value || "").trim() || "admin";
-    var role = roleEl.value || "admin";
+    // 角色/用户名不再随请求发送: 身份完全由 Authorization 头里的令牌决定
+    if (authMode !== "anonymous" && !session.token) { onUnauthorized("请先登录"); return; }
 
     addUser(question);
     inputEl.value = "";
@@ -804,11 +907,9 @@
 
     fetch("/api/ask", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders({}),
       body: JSON.stringify({
         question: question,
-        username: username,
-        role: role,
         workflow: currentWf,     // 工作流随分段选择器切换
         agent: true              // 默认多跳; 回归测试可传 false
       })
@@ -820,6 +921,7 @@
       })
       .then(function (res) {
         thinking.row.remove();
+        if (res.status === 401) { onUnauthorized(res.data && res.data.error); return; }
         if (!res.ok) {
           addError((res.data && res.data.error) || ("HTTP " + res.status));
         } else {
@@ -883,17 +985,18 @@
   }
 
   function loadAudit() {
-    var role = roleEl.value || "admin";
-    if (role !== "admin") {                      // 非 admin (sales/viewer) 不发起请求
+    if (session.role !== "admin") {              // 非 admin 不发起请求 (服务端同样会拦)
       auditBody.innerHTML = '<tr><td class="empty-row" colspan="6">当前角色无权查看</td></tr>';
       return;
     }
     auditBody.innerHTML = '<tr><td class="empty-row" colspan="6">加载中…</td></tr>';
-    fetch("/api/audit?limit=" + AUDIT_LIMIT + "&role=" + encodeURIComponent(role))
+    // 角色不再放在查询串里: 服务端从令牌解析, ?role= 已无效
+    fetch("/api/audit?limit=" + AUDIT_LIMIT, { headers: authHeaders({}) })
       .then(function (resp) {
-        return resp.json().then(function (d) { return { ok: resp.ok, data: d }; });
+        return resp.json().then(function (d) { return { ok: resp.ok, status: resp.status, data: d }; });
       })
       .then(function (res) {
+        if (res.status === 401) { onUnauthorized(res.data && res.data.error); return; }
         if (!res.ok) {
           auditBody.innerHTML = '<tr><td class="err-row" colspan="6">' +
             esc((res.data && res.data.error) || "加载失败") + "</td></tr>";
@@ -921,24 +1024,39 @@
     if (e.key === "Escape" && !maskEl.hidden) closeAudit();
   });
 
-  // ---------- 角色切换 ----------
-  function syncRole() {
-    var role = roleEl.value || "admin";
-    hintEl.textContent = roleText(role);
-    auditBtn.hidden = (role !== "admin");              // 仅 admin 显示审计入口
-    if (role !== "admin" && !maskEl.hidden) closeAudit();
-  }
-  roleEl.addEventListener("change", syncRole);
-  syncRole();
+  // ---------- 启动: 恢复会话 + 健康检查 ----------
+  // authMode 由 /api/health 下发: anonymous 表示服务端关闭了鉴权 (仅本地演示)
+  var authMode = "token";
 
-  // ---------- 健康检查 ----------
+  (function restoreSession() {
+    try {
+      var raw = sessionStorage.getItem(TOKEN_KEY);
+      if (!raw) return;
+      var saved = JSON.parse(raw);
+      if (saved && saved.token) {
+        session = {
+          token: saved.token, user: saved.user || "", role: saved.role || "",
+          display: saved.display || saved.user || ""
+        };
+      }
+    } catch (e) { /* 解析失败按未登录处理 */ }
+  })();
+
   fetch("/api/health")
     .then(function (r) { return r.json(); })
     .then(function (d) {
+      authMode = d.auth_mode || "token";
       healthEl.innerHTML = "索引就绪 · <b>" + (d.chunks || 0) + "</b> 分块 / " +
                            (d.documents || 0) + " 文档";
+      if (authMode === "anonymous") {
+        session = { token: "", user: "demo", role: "admin", display: "匿名演示" };
+      }
+      syncIdentity();
     })
-    .catch(function () { healthEl.textContent = "服务未连接"; });
+    .catch(function () {
+      healthEl.textContent = "服务未连接";
+      syncIdentity();
+    });
 
   switchWorkflow(currentWf);      // 初始化工作流选择器与 chips (含输入区副本)
   autoGrow();

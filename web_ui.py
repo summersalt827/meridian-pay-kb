@@ -14,15 +14,29 @@
 特性:
   1. 仅用标准库 http.server 实现, 不引入 Flask/FastAPI 等第三方依赖
   2. GET  /             -> 返回 static/index.html 单页聊天界面
-  3. GET  /api/health   -> 返回服务与索引状态 (分块数/文档数/可用工作流)
-  4. POST /api/ask      -> {question, username, role, agent?, workflow?}
+  3. GET  /api/health   -> 返回服务与索引状态 (分块数/文档数/可用工作流/鉴权模式)
+  4. POST /api/login    -> {username, password} => {token, user, role, expires_at}
+                           口令经 PBKDF2 校验, 令牌由服务端 HMAC 签名
+  5. POST /api/ask      -> Authorization: Bearer <token>; body {question, agent?, workflow?}
                            => {answer, mode, sources, ts, agent, workflow, sub_queries, elapsed_ms}
-  5. GET  /api/audit    -> ?limit=20&role=admin, 审计日志仅 admin 可见 (sales/viewer 403)
-  6. 角色 -> 目录映射在服务端硬编码, 不接受前端传参覆盖
+  6. GET  /api/audit    -> 需 Bearer 令牌且角色为 admin, 否则 401/403
   7. 相关性门 _gate_sources(): 低于 min_score 的来源一律过滤, 全部过滤则判 no_context
-     (沙箱版 kb_qa 的 retriever 没有该阈值, 故在 web 层实现; 本机 kb_qa 已有则为幂等过滤)
   8. 启动时自动 kb.build(), 静态资源禁止路径穿越
   9. 部署前置 (10/12): 默认绑定 0.0.0.0, 端口读 PORT / WEB_PORT 环境变量 (Render 部署用)
+
+鉴权 (修复越权漏洞)
+------------------------
+修复前: role 由 POST 请求体声明, 服务端只校验它是不是 admin/sales/viewer 之一。
+任何人发一条 {"role":"admin"} 就能读到全部 internal 文档——角色是客户端说了算的。
+
+修复后:
+  - 身份一律来自服务端签发的令牌, 请求体/查询串里的 role 与 username 一律忽略;
+  - 「角色 -> 目录」映射仍在服务端硬编码, 令牌只携带角色名, 目录永不可被客户端影响;
+  - 无令牌/令牌过期/签名不符 -> 401; 角色不足 -> 403;
+  - 生产请设置 KB_AUTH_SECRET (否则密钥随机生成, 进程重启即全部登出)。
+
+保留一个显式降级开关 KB_AUTH_MODE=anonymous (仅本地演示, 启动会打印醒目警告):
+该模式下恢复「请求体声明角色」的旧行为, 便于对照回归。
 
 依赖: numpy (kb_qa 需要), 其余全部标准库。
 """
@@ -46,6 +60,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
+from auth import (  # noqa: E402
+    DEMO_ACCOUNTS,
+    Account,
+    UserDirectory,
+    load_directory_from_env,
+)
 from kb_qa import (  # noqa: E402  (需先补 sys.path)
     DEFAULT_WORKFLOW_ID,
     WORKFLOWS,
@@ -89,8 +109,10 @@ class WebConfig:
     max_question_len: int = 2000                                           # 单条问题最大字符数
     audit_default_limit: int = 20                                          # 审计日志默认条数
     audit_max_limit: int = 100                                             # 审计日志条数上限
-    min_score: float = 0.3                                                 # 来源相关性下限 (与 kb_qa 对齐)
+    min_score: float = 0.17                                                # 来源相关性下限 (与 kb_qa 对齐)
     default_agent: bool = True                                             # /api/ask 未传 agent 时的默认行为
+    # 鉴权模式: token=需要登录 (默认, 生产必开); anonymous=关闭鉴权, 仅本地演示
+    auth_mode: str = "token"
 
     @classmethod
     def from_env(cls) -> "WebConfig":
@@ -98,14 +120,16 @@ class WebConfig:
 
         端口读取顺序: PORT (Render 部署标准变量) -> WEB_PORT -> 8000。
         """
+        mode = (os.getenv("KB_AUTH_MODE") or "token").strip().lower()
         return cls(
             host=os.getenv("WEB_HOST", "0.0.0.0"),
             port=int(os.getenv("PORT") or os.getenv("WEB_PORT") or "8000"),
             kb_root=os.getenv("KB_ROOT") or os.path.join(BASE_DIR, "sample_docs"),
             db_path=os.getenv("KB_DB") or os.path.join(BASE_DIR, "kb_audit.db"),
             top_k=int(os.getenv("KB_TOP_K", "4")),
-            min_score=float(os.getenv("KB_MIN_SCORE", "0.3")),
+            min_score=float(os.getenv("KB_MIN_SCORE", "0.17")),
             default_agent=_env_bool("KB_AGENT_DEFAULT", True),
+            auth_mode="anonymous" if mode == "anonymous" else "token",
         )
 
     def to_kb_config(self) -> Config:
@@ -158,14 +182,16 @@ class KBQAHTTPServer(ThreadingHTTPServer):
     allow_reuse_address = True
 
     def __init__(self, addr: tuple[str, int], handler: type[BaseHTTPRequestHandler],
-                 kb: KnowledgeBase, web_cfg: WebConfig):
+                 kb: KnowledgeBase, web_cfg: WebConfig,
+                 directory: UserDirectory | None = None):
         super().__init__(addr, handler)
         self.kb = kb            # 全局共享的知识库实例 (索引只读, 线程安全)
         self.web_cfg = web_cfg
+        self.directory = directory   # 账号目录 (鉴权关闭时为 None)
 
 
 class KBHandler(BaseHTTPRequestHandler):
-    """路由: 静态页面 + /api/health + /api/ask + /api/audit。"""
+    """路由: 静态页面 + /api/health + /api/login + /api/ask + /api/audit。"""
 
     server_version = "KBQAWeb/1.0"
 
@@ -178,6 +204,37 @@ class KBHandler(BaseHTTPRequestHandler):
     @property
     def web_cfg(self) -> WebConfig:
         return self.server.web_cfg  # type: ignore[attr-defined]
+
+    @property
+    def directory(self) -> UserDirectory | None:
+        return self.server.directory  # type: ignore[attr-defined]
+
+    # ---- 鉴权 ----
+
+    def _auth_enabled(self) -> bool:
+        return self.web_cfg.auth_mode == "token" and self.directory is not None
+
+    def _bearer_token(self) -> str | None:
+        """从 Authorization: Bearer <token> 提取令牌。"""
+        raw = self.headers.get("Authorization") or ""
+        parts = raw.strip().split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            return parts[1]
+        return None
+
+    def _current_account(self) -> Account | None:
+        """当前请求身份; 鉴权关闭时返回 None (由调用方走匿名分支)。"""
+        if not self._auth_enabled():
+            return None
+        return self.directory.verify_token(self._bearer_token())  # type: ignore[union-attr]
+
+    def _require_account(self) -> Account | None:
+        """要求已登录; 未通过时直接写 401 并返回 None。"""
+        acct = self._current_account()
+        if acct is None:
+            self._send_error_json(401, "未登录或令牌已失效, 请先 POST /api/login")
+            return None
+        return acct
 
     # ---- 基础 IO ----
 
@@ -250,10 +307,14 @@ class KBHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         path = urllib.parse.urlparse(self.path).path
-        if path != "/api/ask":
+        if path == "/api/login":
+            self._handle_login()
+        elif path == "/api/logout":
+            self._handle_logout()
+        elif path == "/api/ask":
+            self._handle_ask()
+        else:
             self._send_error_json(404, f"未知路径: {path}")
-            return
-        self._handle_ask()
 
     def do_OPTIONS(self) -> None:  # noqa: N802
         """预检请求, 便于本地跨域调试。"""
@@ -289,16 +350,81 @@ class KBHandler(BaseHTTPRequestHandler):
             "role_dirs": {r: list(d) for r, d in ROLE_ALLOWED_DIRS.items()},
             "workflows": list(VALID_WORKFLOWS),                              # 可用工作流
             "workflow_names": {w.id: w.name for w in WORKFLOWS.values()},    # 展示名映射
+            "auth_mode": "token" if self._auth_enabled() else "anonymous",   # 是否需要登录
+            "demo_accounts": sorted(self.directory.accounts) if self.directory else [],
             "ts": _now_iso(),
         })
 
-    def _handle_audit(self, query: dict[str, list[str]]) -> None:
-        """审计日志接口: 仅 admin 可见, 返回最近问答记录 (时间倒序)。"""
-        role = (query.get("role") or [""])[0].strip().lower()
-        if role != "admin":
-            # 治理演示点: 缺省或非 admin 一律拒绝, 不放开
-            self._send_error_json(403, "审计日志仅 admin 可见")
+    # ---- 登录 / 登出 ----
+
+    def _handle_login(self) -> None:
+        """口令换令牌: POST {username, password} => {token, user, role, expires_at}。"""
+        try:
+            payload = self._read_json_body()
+        except ValueError as e:
+            self._send_error_json(400, str(e))
             return
+
+        if not self._auth_enabled():
+            self._send_error_json(400, "当前为 anonymous 模式, 无需登录")
+            return
+
+        username = str(payload.get("username", "")).strip()
+        password = str(payload.get("password", ""))
+        if not username or not password:
+            self._send_error_json(400, "username 与 password 均不能为空")
+            return
+
+        directory = self.directory
+        assert directory is not None
+        acct = directory.authenticate(username, password)
+        if acct is None:
+            # 不区分「用户不存在」与「口令错误」, 避免账号枚举
+            self._send_error_json(401, "用户名或口令不正确")
+            return
+
+        token, expires_at = directory.issue_token(acct)
+        self._send_json(200, {
+            "status": "ok",
+            "token": token,
+            "user": acct.username,
+            "display": acct.display,
+            "role": acct.role,                       # 角色由服务端账号决定, 与请求无关
+            "allowed_dirs": list(ROLE_ALLOWED_DIRS.get(acct.role, ())),
+            "ttl_seconds": directory.ttl_seconds,
+            "expires_at": expires_at,
+            "ts": _now_iso(),
+        })
+
+    def _handle_logout(self) -> None:
+        """吊销当前令牌 (加入 jti 黑名单, 立即失效)。"""
+        if not self._auth_enabled():
+            self._send_json(200, {"status": "ok", "revoked": False})
+            return
+        directory = self.directory
+        assert directory is not None
+        revoked = directory.revoke(self._bearer_token())
+        self._send_json(200, {"status": "ok", "revoked": revoked})
+
+    def _handle_audit(self, query: dict[str, list[str]]) -> None:
+        """审计日志接口: 仅 admin 可见, 返回最近问答记录 (时间倒序)。
+
+        角色判定来自令牌而非查询串——修复前 ?role=admin 即可越权读取全部审计记录。
+        """
+        if self._auth_enabled():
+            acct = self._require_account()
+            if acct is None:
+                return                                   # 已写 401
+            if acct.role != "admin":
+                self._send_error_json(403, "审计日志仅 admin 可见")
+                return
+            role = acct.role
+        else:
+            # anonymous 模式: 保留旧的查询串声明方式, 仅供本地演示
+            role = (query.get("role") or [""])[0].strip().lower()
+            if role != "admin":
+                self._send_error_json(403, "审计日志仅 admin 可见")
+                return
 
         raw_limit = (query.get("limit") or [str(self.web_cfg.audit_default_limit)])[0].strip()
         try:
@@ -360,8 +486,6 @@ class KBHandler(BaseHTTPRequestHandler):
             return
 
         question = str(payload.get("question", "")).strip()
-        username = str(payload.get("username", "")).strip() or "admin"
-        role = str(payload.get("role", "admin")).strip().lower() or "admin"
         use_agent = _as_bool(payload.get("agent"), self.web_cfg.default_agent)
         workflow_id = str(payload.get("workflow", DEFAULT_WORKFLOW_ID)).strip() or DEFAULT_WORKFLOW_ID
 
@@ -371,15 +495,28 @@ class KBHandler(BaseHTTPRequestHandler):
         if len(question) > self.web_cfg.max_question_len:
             self._send_error_json(400, f"question 超过 {self.web_cfg.max_question_len} 字符")
             return
-        if role not in VALID_ROLES:
-            self._send_error_json(400, "role 只能是 " + " / ".join(VALID_ROLES))
-            return
         # agent=false 时忽略 workflow (不校验), 保证回归路径不受影响
         if use_agent and workflow_id not in VALID_WORKFLOWS:
             self._send_error_json(400, "workflow 只能是 " + " / ".join(VALID_WORKFLOWS))
             return
 
-        # 目录白名单由服务端按角色硬编码, 不接受前端传参
+        # ---- 身份: 一律以服务端为准 ----
+        # 修复前 username/role 直接取自请求体, 任何人都能声明自己是 admin。
+        # 现在请求体里的这两个字段被完全忽略, 只接受令牌里的身份。
+        if self._auth_enabled():
+            acct = self._require_account()
+            if acct is None:
+                return                                   # 已写 401
+            username, role = acct.username, acct.role
+        else:
+            # anonymous 模式: 沿用旧的请求体声明方式, 仅供本地演示
+            username = str(payload.get("username", "")).strip() or "admin"
+            role = str(payload.get("role", "admin")).strip().lower() or "admin"
+            if role not in VALID_ROLES:
+                self._send_error_json(400, "role 只能是 " + " / ".join(VALID_ROLES))
+                return
+
+        # 目录白名单由服务端按角色硬编码, 不接受任何客户端输入
         allowed_dirs: tuple[str, ...] = ROLE_ALLOWED_DIRS[role]
         user = User(username=username, role=role, allowed_dirs=allowed_dirs)
 
@@ -431,8 +568,8 @@ class KBHandler(BaseHTTPRequestHandler):
     def _gate_sources(sources: list[dict[str, Any]], min_score: float) -> list[dict[str, Any]]:
         """过滤低于相关性下限的来源。
 
-        与 kb_qa 的 min_score 语义保持一致; 若 kb_qa 侧已内置该阈值, 此处为幂等过滤,
-        不会出现二次截断。
+        与 kb_qa 的 min_score 语义一致 (同为 relevance 绝对分, 0~1 跨查询可比),
+        因此这里的二次过滤是幂等的, 不会出现额外截断。
         """
         if min_score <= 0 or not sources:
             return sources
@@ -482,6 +619,22 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[错误] 静态目录不存在: {cfg.static_dir}")
         return 2
 
+    # ---- 鉴权 ----
+    directory: UserDirectory | None = None
+    if cfg.auth_mode == "token":
+        directory, ephemeral = load_directory_from_env()
+        print("[启动] 鉴权: token 模式 (角色由服务端签发, 请求体声明无效)")
+        if ephemeral:
+            print("[警告] 未设置 KB_AUTH_SECRET —— 签名密钥为本次进程随机生成, "
+                  "服务重启后所有令牌立即失效。生产务必设置该环境变量。")
+        demo_pwd = os.getenv("KB_DEMO_PASSWORD") or "meridian-demo"
+        print("[启动] 演示账号: " + ", ".join(
+            f"{u}({r})" for u, r, _d in DEMO_ACCOUNTS
+        ) + f" —— 统一口令: {demo_pwd} (用 KB_DEMO_PASSWORD 修改)")
+    else:
+        print("[警告] 鉴权: anonymous 模式 —— 角色由请求体声明, 任何人可自称 admin。"
+              "仅限本地演示, 切勿用于任何可公开访问的环境。")
+
     t0 = time.time()
     kb = build_kb(cfg)
     docs = sorted({c.path for c in kb.chunks})
@@ -489,9 +642,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[启动] 已摄入 {len(kb.chunks)} 个分块 / {len(docs)} 篇文档, 耗时 {time.time() - t0:.2f}s")
     print(f"[启动] 审计日志: {cfg.db_path}")
     print(f"[启动] 工作流: {', '.join(VALID_WORKFLOWS)}")
+    print(f"[启动] 相关性阈值 min_score = {cfg.min_score} (relevance 绝对分)")
     print(f"[启动] 服务地址: http://localhost:{cfg.port}/")
 
-    httpd = KBQAHTTPServer((cfg.host, cfg.port), KBHandler, kb=kb, web_cfg=cfg)
+    httpd = KBQAHTTPServer((cfg.host, cfg.port), KBHandler, kb=kb, web_cfg=cfg,
+                           directory=directory)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

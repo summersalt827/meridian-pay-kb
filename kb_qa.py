@@ -13,8 +13,13 @@
      同一套多跳骨架 + 不同的 plan/synth prompt = 不同的业务 agent (knowledge_qa / gtm_research)
   7. 来源平台标注 (Confluence / Drive / Jira): 只存在于 DOC_SOURCES 代码常量,
      在摄入时挂到 chunk 上, 绝不写入文档正文, 因此不污染检索词面
-  8. retriever 层 min_score 相关性阈值 (本机独有, 10/10 修复 viewer 低分凑数漏网):
-     最佳来源低于阈值即视为无命中, 与 web 层相关性门双保险 (幂等)
+  8. retriever 层 min_score 相关性阈值 (11/28 重写打分口径):
+     旧口径把 BM25 与 TF-IDF 各自 min-max 归一化后加权, 排第一的分数恒接近 1.0,
+     阈值 0.3 几乎从不触发——完全无关的长句也能带著 4 条来源过门 (实测可复现)。
+     新口径改为「绝对可比分」relevance = BM25 分 / 该查询的 BM25 自匹配上界:
+     以「把查询自身当文档」的 BM25 得分作为该查询的理论上界, 语料里不存在的
+     查询词 idf 极高会抬升上界, 从而把「碰巧撞上一个常见字」的文档压到低分。
+     分数落在 0~1 且跨查询可比, 因此阈值判定与展示分数第一次真正有意义。
 
 依赖: numpy, requests (均为沙箱预装), 其余全部标准库。
 """
@@ -136,7 +141,15 @@ class Config:
     chunk_overlap: int = 120                # 分块重叠
     top_k: int = 4                          # 返回来源数
     alpha: float = 0.5                      # 混合权重 (向量占比), 0=纯关键词, 1=纯向量
-    min_score: float = 0.3                  # 相关性阈值: 最佳来源低于此分视为无命中 (防止 RBAC 过滤后低分文档凑数)
+    # 相关性阈值 (relevance 口径, 0~1 绝对可比): 低于此分视为噪声, 直接丢弃;
+    # RBAC 过滤后若无任何来源过门则判 no_context, 杜绝低分文档凑数。
+    # 0.17 由 27 组标注样本实测标定, 三类恰好完全分离:
+    #   语料有答案的提问  最低 0.189 (「折扣规则是什么」→ 命中定价折扣章节)
+    #   语料只沾一两句的  最高 0.152 (「打印机坏了找谁修」→ 判无命中可接受)
+    #   语料完全无关的    最高 0.145 (「今天天气怎么样」)
+    # 取 0.152 与 0.189 的几何中点。改这个值前请重跑 test_relevance.py。
+    min_score: float = 0.17
+    candidate_pool: int = 20                # 混合召回候选池下限 (相关性重排的输入窗口)
     # agent 规划模式: auto=LLM 优先+离线兜底 / llm=仅 LLM(不可用则单跳) / offline=仅离线规划
     plan_mode: str = "auto"
     # LLM (OpenAI 兼容)
@@ -155,6 +168,7 @@ class Config:
         return cls(
             kb_root=os.getenv("KB_ROOT", "sample_docs"),
             db_path=os.getenv("KB_DB", "kb_audit.db"),
+            min_score=float(os.getenv("KB_MIN_SCORE", "0.17")),
             llm_base_url=os.getenv("LLM_BASE_URL", ""),
             llm_api_key=os.getenv("LLM_API_KEY", ""),
             llm_model=os.getenv("LLM_MODEL", "gpt-4o-mini"),
@@ -198,6 +212,9 @@ WORKFLOWS: dict[str, AgentWorkflow] = {
             "你是检索规划器。把用户问题拆成若干个可以各自独立检索知识库的子问题。\n"
             "要求: 子问题之间不重复; 每个子问题都能单独拿去检索; 合起来覆盖原问题的全部意图;\n"
             "不要改写专业术语, 保留原问题里的关键词。\n"
+            "⚠️ 每个子问题只包含本主题的关键词, 严禁把其他子问题的关键词带进来:\n"
+            "例如「薪酬带宽是多少，打折规则是什么」必须拆成「薪酬带宽是多少」与「打折规则是什么」两个子问题,\n"
+            "打折子问题里不得再出现薪酬。\n"
             "只输出 JSON 字符串数组, 不要解释、不要代码块标记, 例如: [\"子问题1\", \"子问题2\"]。"
         ),
         synth_prompt=(
@@ -222,15 +239,24 @@ WORKFLOWS: dict[str, AgentWorkflow] = {
             "只输出 JSON 字符串数组, 不要解释、不要代码块标记。"
         ),
         synth_prompt=(
-            "你是 GTM 账户情报助手。只依据下方来源资料, 输出一份「账户情报简报」, 结构固定为:\n"
-            "## 一、公司概况与信号判断\n"
+            "你是 GTM 账户情报助手。只依据下方来源资料与用户提供的公司事实, 输出一份「账户情报简报」, 结构固定为:\n"
+            "## 一、公司概况与信号评分卡\n"
+            "- 公司概况一句话; 然后 Fit×Timing×Access×Intent 四维各 0-25 分、总分 100, 映射 tier:\n"
+            "  80-100 Hot(AE 2 小时内响应) / 60-79 Warm(SDR 24 小时内首触) / 40-59 Cold(培育序列或 PARK) / <40 不追\n"
+            "- 每个得分必须标注依据: 「用户提供的事实」或「文档规则(来源编号)」; 用户未提供的事实维度写「资料未覆盖, 需人工补充」且该维记 0\n"
+            "- 命中「不追清单」红线时直接输出 tier=不追并说明命中的红线条款(来源编号)\n"
             "## 二、ICP 分层判断与路由建议\n"
+            "- tier 驱动路由(自助/SDR/AE), 与评分卡联动; 命中红线时输出「不追 / PARK」而非硬推\n"
             "## 三、推荐套餐与折扣权限说明\n"
             "## 四、客户案例与合规边界\n"
-            "要求: 每个小节末尾用括号标注引用的来源编号, 例如 (来源2);\n"
-            "资料未覆盖的内容写「资料未覆盖, 需人工补充」, 不要编造客户信息。\n"
-            "简报最后附一个「## 需人工决策」小节, 列出必须由人拍板的事项, 例如折扣是否特批、\n"
-            "是否触发合规评估、是否需要 CFO 双签——agent 完成分析, 决策权留给人。"
+            "## 五、首触邮件草稿\n"
+            "- 主题行(≤8 个英文词) + 正文 3-4 句(钩子=评分卡里最强的 1 个信号 + 一句价值主张 + 一个行动邀请) + 合规注记一行\n"
+            "- 禁用 AI 味词: delve, leverage, elevate, unlock, seamless, cutting-edge, \"I hope this email finds you well\", \"Let's schedule a call\", 赋能, 一站式, 无缝, 极致, 闭环, 共创, 对齐(动词)\n"
+            "- 合规注记格式: 「合规注记: 基于公开融资/招聘信息首触(PDPA 允许); 含退订机制(CAN-SPAM); 邮件为草稿, 发送前需销售经理批准」\n"
+            "- 邮件素材只引用来源资料中的话术/案例(标注来源编号), 不编造客户信息\n"
+            "要求: 每小节末尾用括号标注引用的来源编号, 例如 (来源2); 资料未覆盖的内容写「资料未覆盖, 需人工补充」, 不要编造客户信息。\n"
+            "简报最后附一个「## 需人工决策」小节, 列出必须由人拍板的事项, 例如折扣是否特批、是否触发合规评估、\n"
+            "是否需要 CFO 双签、首触邮件是否发送(默认草稿)——agent 完成分析, 决策权留给人。"
         ),
         max_sub_questions=4,
         sub_queries_authoritative=True,
@@ -241,10 +267,11 @@ WORKFLOWS: dict[str, AgentWorkflow] = {
             "销售 SOP 与赢单丢单复盘",
         ),
         report_sections=(
-            ("公司概况与信号判断", "信号 融资 招聘 扩张 新市场 行业 优先级"),
+            ("公司概况与信号评分卡", "评分 信号 融资 招聘 扩张 新市场 行业 优先级 红线 不追"),
             ("ICP 分层判断与路由建议", "分层 画像 路由 自助 SDR AE 首触 打法"),
             ("推荐套餐与折扣权限说明", "套餐 月费 费率 折扣 审批 年付 优惠 报价单"),
             ("客户案例与合规边界", "案例 行业 合规 尽调 风控 制裁 KYC"),
+            ("首触邮件草稿", "邮件 话术 首触 主题行 合规"),
         ),
         human_decisions=(
             "折扣超过销售总监 15% 权限时, 是否提交 CEO 特批？",
@@ -252,6 +279,7 @@ WORKFLOWS: dict[str, AgentWorkflow] = {
             "客户行业 / 股东结构是否触发合规评估 (评估期间不得报价)？",
             "是否为本单配置专属客户经理与 SLA (仅 Enterprise)？",
             "路由结果是否需销售运营申诉 (不允许人工抢占路由)？",
+            "首触邮件是否发送 (默认草稿, 销售经理批准后进入发送队列)？",
         ),
     ),
 }
@@ -519,6 +547,27 @@ class BM25Index:
         df = self.df.get(term, 0)
         return float(np.log((self.n - df + 0.5) / (df + 0.5) + 1.0))
 
+    def idf_of(self, term: str) -> float:
+        """公开 idf 查询 (相关性打分需要按 idf 加权统计查询覆盖率)。"""
+        return self._idf(term)
+
+    def self_ceiling(self, query_tokens: list[str]) -> float:
+        """把「查询自身」当作一篇文档算 BM25, 作为该查询的得分理论上界。
+
+        关键性质: 语料里根本不存在的查询词 df=0, idf 极高, 会把上界抬得很高,
+        于是「靠一个常见字撞上文档」的绝对分虽然可能不低, 归一化后依然很低。
+        这正是区分「真的相关」与「碰巧撞字」的信号, 也是旧 min-max 归一化
+        口径完全缺失的部分 (它只看同一次查询内部的相对高低, 跨查询不可比)。
+        """
+        if not query_tokens:
+            return 0.0
+        dl = float(len(query_tokens))
+        total = 0.0
+        for t in set(query_tokens):
+            denom = 1.0 + self.k1 * (1.0 - self.b + self.b * dl / (self.avgdl or 1.0))
+            total += self._idf(t) * (self.k1 + 1.0) / denom
+        return float(total)
+
     def score(self, query_tokens: list[str]) -> np.ndarray:
         scores = np.zeros(self.n, dtype=np.float32)
         for q in set(query_tokens):
@@ -551,30 +600,72 @@ def _minmax(arr: np.ndarray) -> np.ndarray:
         return np.zeros_like(arr)
     return (arr - lo) / (hi - lo)
 
+
 class Retriever:
-    """混合检索: alpha 权重向量 + (1-alpha) 权重关键词, 先做 RBAC 过滤。"""
+    """两段式检索: 混合分召回候选 → 绝对相关度重排与过门 → RBAC 过滤。
+
+    为什么要分两段:
+      第一段 hybrid = alpha×向量 + (1-alpha)×BM25, 各自 min-max 归一化后加权。
+      它擅长「本次查询内部谁最靠前」, 但归一化后第一名恒接近 1.0, 分数跨查询
+      不可比, 因此**不能**拿来做「有没有命中」的判定——旧实现正是把阈值设在这
+      个量上, 导致阈值形同虚设。
+
+      第二段 relevance = BM25 分 / 该查询的 BM25 自匹配上界, 落在 0~1 且跨查询
+      可比, 既用于最终排序, 也用于 min_score 过门。返回的分数就是这个 relevance,
+      于是「排序 / 门 / 展示」三者第一次语义一致。
+
+    RBAC 与旧实现一样在候选阶段逐条生效: 越权分块根本不会进入结果。
+    """
 
     def __init__(self, chunks: list[Chunk], embedder, bm25: BM25Index,
-                 alpha: float = 0.5, top_k: int = 4, min_score: float = 0.3):
+                 alpha: float = 0.5, top_k: int = 4, min_score: float = 0.17,
+                 candidate_pool: int = 20):
         self.chunks = chunks
         self.embedder = embedder
         self.bm25 = bm25
         self.alpha = alpha
         self.top_k = top_k
         self.min_score = min_score
+        self.candidate_pool = candidate_pool
+
+    # ---- 相关性打分 (绝对可比分, 0~1) ----
+
+    def relevance(self, q_tokens: list[str], idx: int,
+                  ceiling: float | None = None, bm25_raw: float | None = None) -> float:
+        """单个分块相对查询的绝对相关度 = BM25 分 / 该查询的 BM25 自匹配上界。
+
+        曾经尝试再叠加一项「查询信息量覆盖率」(命中的查询实词 idf 之和 / 全部
+        查询实词 idf 之和), 实测后放弃: 中文分词产生大量无意义 bigram
+        (如「折扣能批到几折」里的 能批/批到/到几/几折), 这些词在语料里 df=0,
+        idf 极高, 会把覆盖率的分母撑大而分子几乎不变, 于是**越精炼的提问得分
+        越低**——「折扣能批到几折」因此被误杀 (0.165), 反而不如啰嗦的
+        「大客户报价折扣能批到几折？」(0.377)。单用自匹配归一化则稳定在 0.23。
+        """
+        if ceiling is None:
+            ceiling = self.bm25.self_ceiling(q_tokens)
+        if ceiling <= 0:
+            return 0.0
+        raw = bm25_raw if bm25_raw is not None else float(self.bm25.score(q_tokens)[idx])
+        return max(0.0, min(1.0, raw / ceiling))
+
+    # ---- 检索 ----
 
     def search(self, query: str, user: User, top_k: int | None = None) -> list[tuple[Chunk, float]]:
         k = top_k or self.top_k
         if not self.chunks:
             return []
         q_tokens = tokenize(query)
+        if not q_tokens:
+            return []
+        ceiling = self.bm25.self_ceiling(q_tokens)
+        if ceiling <= 0:                      # 查询里没有任何可检索词
+            return []
 
-        # 向量得分
+        # ---- 第一段: 混合分召回候选 ----
         n = len(self.chunks)
         v_scores = np.zeros(n, dtype=np.float32)
         for idx, sc in self.embedder.search(q_tokens, n):
             v_scores[idx] = sc
-        # 关键词得分
         k_scores = np.zeros(n, dtype=np.float32)
         for idx, sc in self.bm25.search(q_tokens, n):
             k_scores[idx] = sc
@@ -582,21 +673,25 @@ class Retriever:
         v_n, k_n = _minmax(v_scores), _minmax(k_scores)
         hybrid = self.alpha * v_n + (1 - self.alpha) * k_n
 
-        # RBAC 过滤
-        order = np.argsort(-hybrid)
-        results: list[tuple[Chunk, float]] = []
+        # 候选窗口取 max(k*4, candidate_pool): 给相关性重排留出足够输入,
+        # 避免真正相关的分块被 hybrid 的相对排序挡在窗口外。
+        pool = max(k * 4, self.candidate_pool)
+        order = np.argsort(-hybrid)[:pool]
+
+        # ---- 第二段: RBAC 过滤 + 绝对相关度过门 + 重排 ----
+        scored: list[tuple[Chunk, float]] = []
         for i in order:
             if hybrid[i] <= 0:
                 continue
             c = self.chunks[i]
-            if user.can_access(c.path):     # 目录级权限在这里生效
-                results.append((c, float(hybrid[i])))
-            if len(results) >= k:
-                break
-        # RBAC 过滤后最佳来源仍低于阈值 → 视为无命中, 不返回低分凑数结果
-        if results and results[0][1] < self.min_score:
-            return []
-        return results
+            if not user.can_access(c.path):     # 目录级权限在这里生效
+                continue
+            rel = self.relevance(q_tokens, int(i), ceiling=ceiling, bm25_raw=float(k_scores[i]))
+            if rel < self.min_score:            # 低于阈值一律丢弃, 不凑数
+                continue
+            scored.append((c, rel))
+        scored.sort(key=lambda p: -p[1])
+        return scored[:k]
 
 # ============================================================
 # LLM 生成 (OpenAI 兼容, 带抽取式回退)
@@ -1049,7 +1144,7 @@ class KnowledgeBase:
         self.retriever = Retriever(
             self.chunks, self.embedder, self.bm25,
             alpha=self.cfg.alpha, top_k=self.cfg.top_k,
-            min_score=self.cfg.min_score,
+            min_score=self.cfg.min_score, candidate_pool=self.cfg.candidate_pool,
         )
         self._built = True
 
@@ -1152,24 +1247,23 @@ class KnowledgeBase:
                           k: int, authoritative: bool = False) -> list[tuple[Chunk, float]]:
         """执行步: 每个子问题独立检索 (RBAC 在 retriever 内逐条生效), 再合并去重。
 
-        合并口径分两种:
-        - 常规 (authoritative=False): 原问题那一跳的分数是权威分; 深挖只能补充
-          「原问题已召回文档」的其它章节, 且分数不得超过该文档在原问题检索中的
-          最佳分——防 LLM 拆题跑偏把不相关文档抬成高相关。
-        - authoritative=True (固定维度骨架的工作流, 如 gtm_research): 子问题
-          本身是设计好的权威检索语句 (客户调研问题不含「套餐/折扣」等维度词,
-          只有子问题才含), 深挖结果按原分直接合并。
         两种模式都: RBAC 在子问题层级生效; 低于 min_score 的来源在合并时即剔除,
         保证 LLM 合成上下文与 web 门过滤后的来源列表一致 (回答里的来源编号
         不会指向列表里不存在的条目)。
+
+        关于「防拆题跑偏」: 旧口径下分数是 min-max 归一化后的相对分, 跨查询不
+        可比, 只能靠「深挖分不得超过原问题对该文档的分数」(cap) 和「原问题没
+        召回过的文档不许混入」两条补丁来压制。改写为绝对可比的 relevance 之后,
+        min_score 门本身就承担了这个职责——不相关文档的 relevance 天然低, 因此
+        这两条补丁一并移除:
+          - cap 会误伤真正的深挖成果 (长句原问题的自匹配上界很高, 把 base 分整体
+            压低, 连带把子问题命中的高相关章节也 cap 到很低, 实测只剩 1 条来源);
+          - 「原问题未召回不许混入」与多跳初衷相悖, 子问题的价值恰恰在于找到
+            原问题没直接命中的角度。
         """
         min_score = self.cfg.min_score
-        # 原问题同样先做口语词 -> 文档用词的同义改写 (如 打折->折扣), 否则
-        # 口语词零命中会压低整篇文档的 base 分, 连带 cap 掉深挖补充的有效章节
+        # 原问题同样先做口语词 -> 文档用词的同义改写 (如 打折->折扣)
         base = self.retriever.search(_rewrite_query(question), user, k * 2)  # type: ignore[union-attr]
-        base_doc_best: dict[str, float] = {}
-        for c, s in base:
-            base_doc_best[c.path] = max(base_doc_best.get(c.path, 0.0), s)
 
         best: dict[tuple[str, str], tuple[Chunk, float]] = {}
         for c, s in base:
@@ -1179,17 +1273,9 @@ class KnowledgeBase:
             for c, s in self.retriever.search(_rewrite_query(q), user, k):  # type: ignore[union-attr]
                 key = (c.path, c.title)
                 if key in best:
-                    continue                       # 已在原问题那一跳里, 保留权威分
-                if authoritative:
-                    if s >= min_score:
-                        best[key] = (c, s)         # 子问题即权威检索语句, 分数直接采用
-                    continue
-                cap = base_doc_best.get(c.path, 0.0)
-                if cap <= 0:
-                    continue                       # 原问题未召回的文档, 不因改写查询而混入
-                s2 = min(s, cap)
-                if s2 >= min_score:
-                    best[key] = (c, s2)
+                    continue                       # 已在原问题那一跳里, 保留原分
+                if s >= min_score:                 # relevance 绝对可比, 直接采用
+                    best[key] = (c, s)
         merged = sorted(best.values(), key=lambda p: -p[1])
         # authoritative 模式 (gtm_research) 四维子问题各自贡献多条来源,
         # 窗口放宽到 k*3 避免高价值章节 (如折扣审批权限) 被截断
