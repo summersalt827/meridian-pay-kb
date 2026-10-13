@@ -44,16 +44,30 @@
 - 查询规划块（子问题可视化）、耗时、来源引用 + 平台徽章（Confluence/Drive/Jira，代码常量映射）
 - no_context 设计化拒绝卡片：「证据不足 · 已拒绝回答」——宁可拒绝，不给没有依据的答案
 
-## 评测（四套，81 断言）
+## 评测（四套，81 断言 — 2026-10-13 全绿）
 
-| 套件 | 用例 | 断言 |
-|------|------|------|
-| test_rbac.py | 8 | 金标准：leak rate = 0 + recall 漏检 = 0（成对断言） |
-| test_relevance.py | 21 | 无关必 no_context + 正样本必命中 + 分数可分性（0.17 标定） |
-| test_auth.py | 23 | 认证攻击面：无令牌/伪造角色/篡改 payload/登出吊销/越权入口 |
-| test_web_matrix.py | 29 | 18 组角色矩阵 + 审计权限 + agent 工作流用例 |
+| 套件 | 用例 | 断言 | 结果 | 关键数字 |
+|------|------|------|------|----------|
+| test_rbac.py | 8 | 金标准：leak rate = 0 + recall 漏检 = 0（成对断言） | 8/8 ✅ | **leak rate = 0 · recall 漏检 = 0** |
+| test_relevance.py | 21 | 无关必 no_context + 正样本必命中 + 分数可分性（0.17 标定） | 21/21 ✅ | 无关最高 0.1519 < 0.17 < 命中最低 0.2469（余量 1.12x / 1.45x） |
+| test_auth.py | 23 | 认证攻击面：无令牌/伪造角色/篡改 payload/登出吊销/越权入口 | 23/23 ✅ | 23 攻击面用例全绿 |
+| test_web_matrix.py | 29 | 18 组角色矩阵 + 审计权限 + agent 工作流用例 | 29/29 ✅ | 18 组角色矩阵全绿 |
 
 评测轴对齐行业框架：0 role violations、0 PII leaks、faithfulness 100%（0 幻觉引用）。
+
+## 构建方式（WorkBuddy）
+
+主构建工具为 **WorkBuddy（腾讯云）**：9/26 试跑生成核心 `kb_qa.py`，会话①-⑤（10/8-10/13）依次构建
+Web 界面、鉴权与相关性门标定、GTM 语料、账户情报 agent。会话 prompt 与对话记录在
+[`docs/build-sessions/`](docs/build-sessions/)，12 张聊天截图在 [`证据/`](证据/)。
+Claude Code 负责补丁合并、四套评测质量门与 UI 打磨——完整分工叙事见
+[`docs/AI-COLLABORATION.md`](docs/AI-COLLABORATION.md)。
+
+## 评审速览（For judges）
+
+- **[需求映射表](docs/requirements-map.md)** — Aspire 出题每条要求 → 机制 → 文档 → 可见产物；
+  10 个评审维度（10×10 分）→ 证据对照
+- 提交要件：WorkBuddy 证明（会话①-⑤ + 12 张截图，[AI-COLLABORATION.md](docs/AI-COLLABORATION.md)）✅ · blurb 7 词 ✅ · 封面 16:9 380×216 ✅ · 线上 URL（提交前确认）
 
 ## 运行
 
@@ -100,5 +114,9 @@ test_rbac.py        金标准评测（leak=0 + recall=100%）
 test_relevance.py   相关性门标定评测（21 用例）
 test_auth.py        认证攻击面评测（23 用例，自起服务）
 test_web_matrix.py  Web 层矩阵（29 用例）
+docs/requirements-map.md  需求映射表（Aspire brief → 机制 → 证据 + 评审维度对照）
+docs/AI-COLLABORATION.md  AI 协作分工叙事（WorkBuddy 主构建 + Claude Code 合并验证）
+docs/build-sessions/  WorkBuddy 会话①-⑤ prompt 全文 + 9/26 试跑对话记录
+证据/               WorkBuddy 聊天截图 12 张 + 本机演示截图 8 张 + 封面图
 sample_docs/        Meridian Pay 语料 8 篇（public/internal/gtm，虚构数据）
 ```
