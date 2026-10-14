@@ -5,6 +5,7 @@ services:
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: python web_ui.py
+    healthCheckPath: /api/health
     envVars:
       - key: LLM_BASE_URL
         value: https://api.deepseek.com
@@ -16,3 +17,5 @@ services:
         value: "0.17"
       - key: KB_AUTH_SECRET
         sync: false
+      - key: KB_RESYNC_MINUTES
+        value: "60"
