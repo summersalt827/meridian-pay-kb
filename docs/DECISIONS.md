@@ -30,7 +30,7 @@ How to read it: the **cost** column is the point. A trade-off is only credible i
 | **Rejected** | Vector retrieval by default (better synonym recall, friendlier to long-tail questions) |
 | **Why** | ① **Reproducible**: CI and a judge's own machine need no embedding service or key — all ten suites, 337 assertions, pass in an empty environment; ② **Controllable**: permission filtering must happen at retrieval time (pre-retrieval ACL, OWASP LLM08), and the combination of a lexical index with ACL is far easier to pin with assertions; ③ **Corpus size**: 16 documents / 96 chunks — lexical is sufficient, and the mixed CN/EN tokenisation (single chars + bigrams) behaves predictably |
 | **Cost** | Synonym rewrites rely on `QUERY_SYNONYMS` (query-side only; the corpus is untouched); proper nouns and function words in long queries depress the relevance score, more visibly on a small corpus |
-| **Evidence** | The 0.17 gate calibrated on 27 labelled samples with three fully separated classes (irrelevant ≤0.145 / weak ≤0.152 / answerable ≥0.244); `test_relevance.py`, 21 assertions, guards the margin (irrelevant max 0.1492 < 0.17 < relevant min 0.2464) |
+| **Evidence** | The 0.17 gate calibrated on 27 labelled samples with three fully separated classes (measured: irrelevant/weak max 0.1521 < 0.17 < relevant min 0.2580); `test_relevance.py`, 21 assertions, guards the margin (1.12x / 1.52x) |
 
 ---
 

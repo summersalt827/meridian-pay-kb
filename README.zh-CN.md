@@ -36,7 +36,9 @@
 
 - 混合检索：BM25 + TF-IDF 向量，中英文混合分词（中文单字 + 二字 bigram）
 - 绝对可比相关性门：`relevance = BM25 分 / 查询自匹配上界`，阈值 **0.17 由 27 组标注样本标定**
-  （无关 ≤0.145 / 弱相关 ≤0.152 / 有答案 ≥0.244，三类完全分离）；无关提问干净判 no_context
+  （实测：无关/弱相关最高 0.1521 < 0.17 < 应命中最低 0.2580，三类完全分离，
+  余量 1.12x / 1.52x —— 数字随语料变化，`python3 test_relevance.py` 可随时重算）；
+  无关提问干净判 no_context
 - LLM 生成（OpenAI 兼容接口，可换任意模型）+ 抽取式离线回退 + 瞬时故障自动重试
 
 **权限与安全**
@@ -124,7 +126,7 @@ flowchart LR
 | 套件 | 用例 | 断言 | 结果 | 关键数字 |
 |------|------|------|------|----------|
 | test_rbac.py | 8 | 金标准：leak rate = 0 + recall 漏检 = 0（成对断言） | 8/8 ✅ | **leak rate = 0 · recall 漏检 = 0** |
-| test_relevance.py | 21 | 无关必 no_context + 正样本必命中 + 分数可分性（0.17 标定） | 21/21 ✅ | 无关最高 0.1492 < 0.17 < 命中最低 0.2464（余量 1.14x / 1.45x） |
+| test_relevance.py | 21 | 无关必 no_context + 正样本必命中 + 分数可分性（0.17 标定） | 21/21 ✅ | 无关最高 0.1521 < 0.17 < 命中最低 0.2580（余量 1.12x / 1.52x） |
 | test_auth.py | 23 | 认证攻击面：无令牌/伪造角色/篡改 payload/登出吊销/越权入口 | 23/23 ✅ | 23 攻击面用例全绿 |
 | test_web_matrix.py | 49 | 18 组角色矩阵 + 审计权限 + agent 工作流用例 + **8 金融岗位用例**（合规/风控/卡运营/财务）+ **5 数据新鲜度用例**（resync 权限 + 重扫 worked example）+ 审计链验证权限 + **5 演示模式用例**（`?demo=1` 不成为旁路） | 49/49 ✅ | 全矩阵全绿 |
 | test_redteam.py | 26 | **红队对抗**：语义改写 8 + 提示注入 4 + 路径逃逸 2 + 角色伪造 4 + 多跳拼图泄漏 3 + 阈值压制 2 + 反作弊回归 3 | 26/26 ✅ | **26 种攻击零泄漏**（报告见 [RED-TEAM-REPORT](docs/RED-TEAM-REPORT.md)） |
@@ -209,6 +211,9 @@ need-to-know 最小知情（进 LLM **之前**掩码多类标识，靠 Luhn / mo
   10 个评审维度（10×10 分）→ 证据对照
 - **[关键设计取舍](docs/DECISIONS.md)** — 六条取舍，每条写清「选了什么 / 放弃了什么 /
   **代价**是什么 / 哪条测试盯着它」（含 OOV 词必须计入 BM25 上界的实测反例）
+- **[自我验证清单](docs/SELF-VERIFICATION.md)** — 三分钟浏览器版 + 十分钟命令行版；
+  `python3 scripts/verify.py` 一条命令重跑 37 项（README 的每条对外声明都被重证一遍），
+  `--full` 再跑十套 337 断言
 - 提交要件：WorkBuddy 证明（会话①-⑤ + 12 张截图，[AI-COLLABORATION.md](docs/AI-COLLABORATION.md)）✅ · blurb 8 词（全仓库统一：`Ask anything. RBAC decides. Shield masks. You audit.`）✅ · 封面 16:9 380×216 ✅
 
 ### 30 秒体验路径（live demo）
@@ -304,7 +309,8 @@ docs/AI-COLLABORATION.md  AI 协作分工叙事（WorkBuddy 主构建 + Claude C
 docs/build-sessions/  WorkBuddy 会话①-⑤ prompt 全文 + 9/26 试跑对话记录
 scripts/demo_path.py  demo 路径 e2e 证明（三角色命中/拦截/审计/401/403）
 scripts/demo_shield.py  盾牌对照演示（关/开盾牌 + 答案复检，自带 8 条自检）
-.github/workflows/  CI：每次 push 跑十套 337 断言（无需 LLM key）
+scripts/verify.py   自验证器（37 项快检 + --full 跑十套；盯的是「文档声明是否还成立」）
+.github/workflows/  CI：每次 push 跑十套 337 断言 + 自验证器（无需 LLM key）
 证据/               WorkBuddy 聊天截图 12 张 + 本机演示截图 9 张 + 封面图
 sample_docs/        Meridian Pay 语料 16 篇（public/internal/gtm/compliance/risk/card_ops/finance；gtm 含 LAARC 异议库+信号定义库，虚构数据）
 demo_docs/          盾牌演示语料（含 PII 与注入的争议记录），独立目录不参与标定

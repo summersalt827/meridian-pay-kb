@@ -32,7 +32,7 @@ A parameterised agent-workflow platform: one multi-hop skeleton — *plan → re
 **Retrieval & generation**
 
 - Hybrid retrieval: BM25 + TF-IDF with mixed CN/EN tokenisation (single char + bigram)
-- Absolute relevance gate: `relevance = BM25 score / query self-match ceiling`, threshold **0.17 calibrated on 27 labelled samples** (irrelevant ≤0.145 / weak ≤0.152 / answerable ≥0.244 — three classes fully separated); off-topic questions get a clean `no_context`
+- Absolute relevance gate: `relevance = BM25 score / query self-match ceiling`, threshold **0.17 calibrated on 27 labelled samples** (measured: irrelevant/weak max 0.1521 < 0.17 < relevant min 0.2580 — three classes fully separated, 1.12x / 1.52x margin; numbers drift with the corpus, `python3 test_relevance.py` recomputes them); off-topic questions get a clean `no_context`
 - LLM generation (OpenAI-compatible API, any model) + extractive offline fallback + auto-retry on transient faults
 
 **Permissions & security**
@@ -99,7 +99,7 @@ Responsibilities of the three gates (all deterministic code; the LLM never parti
 | Suite | Cases | What it pins | Result | Key numbers |
 |------|------|------|------|----------|
 | test_rbac.py | 8 | Gold standard: leak rate = 0 + recall loss = 0 (paired assertions) | 8/8 ✅ | **leak rate = 0 · recall loss = 0** |
-| test_relevance.py | 21 | Irrelevant must no_context + positives must hit + score separability (0.17 calibration) | 21/21 ✅ | Irrelevant max 0.1492 < 0.17 < relevant min 0.2464 (1.14x / 1.45x margin) |
+| test_relevance.py | 21 | Irrelevant must no_context + positives must hit + score separability (0.17 calibration) | 21/21 ✅ | Irrelevant max 0.1521 < 0.17 < relevant min 0.2580 (1.12x / 1.52x margin) |
 | test_auth.py | 23 | Auth attack surface: no token / forged role / tampered payload / logout revocation / unauthorised entry | 23/23 ✅ | 23 attack-surface cases green |
 | test_web_matrix.py | 49 | 18 role-matrix pairs + audit permissions + agent workflow cases + **8 fintech role cases** + **5 data-freshness cases** + audit-chain verify permissions + **5 demo-mode cases** (`?demo=1` is not a bypass) | 49/49 ✅ | Full matrix green |
 | test_redteam.py | 26 | **Red team**: semantic rewrites 8 + prompt injection 4 + path escape 2 + role forgery 4 + multi-hop puzzle leaks 3 + threshold suppression 2 + anti-cheat regression 3 | 26/26 ✅ | **26 attacks, zero leaks** (report: [RED-TEAM-REPORT](docs/RED-TEAM-REPORT.md)) |
@@ -170,6 +170,7 @@ Primary build tool is **WorkBuddy (Tencent Cloud)**: the 9/26 foundation run pro
 
 - **[Requirements map](docs/requirements-map.md)** — every Aspire brief requirement → mechanism → document → visible artifact; 10 judging dimensions (10×10) → evidence mapping
 - **[Key design trade-offs](docs/DECISIONS.md)** — six decisions, each stating what was chosen / what was rejected / **the cost** / which tests pin it (including the measured counter-example for why OOV words must count toward the BM25 ceiling)
+- **[Self-verification checklist](docs/SELF-VERIFICATION.md)** — three-minute browser version + ten-minute CLI version; `python3 scripts/verify.py` re-proves 37 claims (every public statement in the README), `--full` additionally runs all ten suites (337 assertions)
 - Submission items: WorkBuddy proof (sessions ①–⑤ + 12 screenshots, [AI-COLLABORATION.md](docs/AI-COLLABORATION.md)) ✅ · 8-word blurb (repo-wide: `Ask anything. RBAC decides. Shield masks. You audit.`) ✅ · 16:9 cover 380×216 ✅
 
 ### 30-second experience path (live demo)
@@ -256,7 +257,8 @@ docs/AI-COLLABORATION.md  AI collaboration narrative (WorkBuddy primary builder 
 docs/build-sessions/  WorkBuddy sessions ①–⑤ full prompts + 9/26 foundation-run transcript
 scripts/demo_path.py  demo path e2e proof (three roles: hit/block/audit/401/403)
 scripts/demo_shield.py  shield contrast demo (off/on + answer re-check, 8 self-checks)
-.github/workflows/  CI: ten suites, 337 assertions on every push (no LLM key needed)
+scripts/verify.py   self-verifier (37-item quick check + --full runs ten suites; checks that documented claims still hold)
+.github/workflows/  CI: ten suites + self-verifier on every push (no LLM key needed)
 证据/               WorkBuddy chat screenshots ×12 + local demo screenshots ×9 + cover image
 sample_docs/        Meridian Pay corpus ×16 (public/internal/gtm/compliance/risk/card_ops/finance; gtm includes LAARC objection playbook + signal library; fictional data)
 demo_docs/          shield demo corpus (dispute record with PII and injection), separate directory, excluded from calibration
