@@ -84,5 +84,5 @@ We demonstrate **two**:
 | Chat history ≥3 screenshots | ✅ 12 provided |
 | Blurb <10 words | ✅ "Enterprise knowledge, one trusted source with RBAC." (7 words) |
 | Cover 16:9 380×216 | ✅ `证据/封面图_16-9_380x216.png` |
-| Project link (bonus) | Render blueprint ready; live URL to be confirmed before submission |
+| Project link (bonus) | ✅ Live at https://meridian-pay-kb.onrender.com (deployed 2026-10-15; health + login + RBAC verified live) |
 | Demo video 5–8 min (optional) | Script drafted (8 beats); recording planned 10/15 |

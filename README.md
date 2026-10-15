@@ -122,7 +122,7 @@ Claude Code 负责补丁合并、四套评测质量门与 UI 打磨——完整�
 
 ### 30 秒体验路径（live demo）
 
-> 线上地址：**`https://<your-app>.onrender.com`**（Render 部署后替换此行；本地体验用 `http://localhost:8000`）
+> 线上地址：**https://meridian-pay-kb.onrender.com**（free 档约 15 分钟无流量会休眠，冷启动约 1 分钟；本地体验用 `http://localhost:8000`）
 
 | 步 | 操作 | 看到什么 |
 |---|---|---|
