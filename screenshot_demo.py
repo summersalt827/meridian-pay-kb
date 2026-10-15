@@ -27,7 +27,7 @@ from playwright.sync_api import sync_playwright
 BASE_DIR = Path(__file__).resolve().parent
 OUT_DIR = BASE_DIR.parent / "证据"
 URL = os.getenv("KB_DEMO_URL", "http://localhost:8000/")
-DATE_TAG = "2026-10-14"
+DATE_TAG = "2026-10-15"
 
 ACCOUNTS = {"alice": "admin", "sam": "sales", "bob": "viewer"}
 DEMO_PASSWORD = "meridian-demo"

@@ -289,7 +289,7 @@ docs/build-sessions/  WorkBuddy 会话①-⑤ prompt 全文 + 9/26 试跑对话�
 scripts/demo_path.py  demo 路径 e2e 证明（三角色命中/拦截/审计/401/403）
 scripts/demo_shield.py  盾牌对照演示（关/开盾牌 + 答案复检，自带 8 条自检）
 .github/workflows/  CI：每次 push 跑八套 171 断言（无需 LLM key）
-证据/               WorkBuddy 聊天截图 12 张 + 本机演示截图 8 张 + 封面图
+证据/               WorkBuddy 聊天截图 12 张 + 本机演示截图 9 张 + 封面图
 sample_docs/        Meridian Pay 语料 16 篇（public/internal/gtm/compliance/risk/card_ops/finance；gtm 含 LAARC 异议库+信号定义库，虚构数据）
 demo_docs/          盾牌演示语料（含 PII 与注入的争议记录），独立目录不参与标定
 ```
