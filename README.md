@@ -204,7 +204,7 @@ need-to-know 最小知情（进 LLM **之前**掩码 11 类标识，靠 Luhn / m
 
 ### 30 秒体验路径（live demo）
 
-> 线上地址：**https://meridian-pay-kb.onrender.com**（free 档约 15 分钟无流量会休眠，冷启动约 1 分钟；本地体验用 `http://localhost:8000`）
+> 线上地址：**https://meridian-pay-kb.onrender.com**（实测空闲 16 分钟后仍秒回；本地体验用 `http://localhost:8000`）
 
 | 步 | 操作 | 看到什么 |
 |---|---|---|
