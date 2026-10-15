@@ -24,7 +24,7 @@ Each session ran as one full prompt in WorkBuddy's sandbox; its patches were bro
 - UI polish: Aspire purple-red brand system, planning block, designed no-context card
 - Docs and README
 
-**Test growth across the build:** 9 tests at the foundation run (9/26) → 227 assertions across nine suites incl. the 26-check red team suite, 8 fintech-role matrix cases, 5 data-freshness (resync) cases, the audit hash-chain suite (append-only triggers + SHA-256 tamper detection), the disclosure-gate suite (customer-present mode: external-context zero leak + zero miss) and the shield suite (need-to-know masking + prompt-injection scan + answer re-check, with paired assertions proving precision) and the GTM scorecard suite (deterministic scoring: reproducible tier mapping, red-line precedence, missing-fact handling) (10/15). CI runs all nine suites on every push.
+**Test growth across the build:** 9 tests at the foundation run (9/26) → 332 assertions across ten suites incl. the 26-check red team suite, 8 fintech-role matrix cases, 5 data-freshness (resync) cases, the audit hash-chain suite (append-only triggers + SHA-256 tamper detection), the disclosure-gate suite (customer-present mode: external-context zero leak + zero miss) and the shield suite (need-to-know masking + prompt-injection scan + answer re-check, with paired assertions proving precision), the GTM scorecard suite (deterministic scoring: reproducible tier mapping, red-line precedence, missing-fact handling) and the GTM outreach suite (deterministic first-touch email: slot filling by tier/industry/strongest signal, red line produces no copy at all, no invented numbers) (10/15). CI runs all ten suites on every push.
 
 ## Proof checklist (Handbook §7)
 

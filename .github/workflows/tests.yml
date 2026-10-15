@@ -44,3 +44,5 @@ jobs:
         run: python3 test_shield.py
       - name: GTM scorecard (deterministic scoring, reproducible)
         run: python3 test_gtm_scorecard.py
+      - name: GTM outreach draft (deterministic email template, no invented numbers)
+        run: python3 test_gtm_outreach.py
