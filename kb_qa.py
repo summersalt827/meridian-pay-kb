@@ -45,6 +45,7 @@ import numpy as np
 
 from shield import ShieldStats, mask_identifiers, rescan_answer, sanitize_for_llm, scan_values
 from scorecard import score_account
+from outreach import draft_outreach
 
 # requests 为可选依赖 (仅接入 LLM/稠密向量时需要); 延迟导入以保持离线零额外依赖
 
@@ -1122,6 +1123,36 @@ def _snippet(text: str, limit: int = 180, drop: str = "") -> str:
     return s[:limit] + "…" if len(s) > limit else s
 
 
+def _proof_ref(sources: list[tuple[Chunk, float]]) -> str:
+    """案例素材的来源编号: 优先 case-studies, 其次 icp-targeting。
+
+    离线简报的第五节要引用量化案例, 引用必须是简报末尾「来源引用」里的真实编号,
+    不能写一个查不到的「来源?」。
+    """
+    for wanted in ("case-studies", "icp-targeting"):
+        for i, (c, _s) in enumerate(sources, start=1):
+            if wanted in (getattr(c, "path", "") or ""):
+                return f"来源{i}"
+    return ""
+
+
+_OBJECTION_HEADER_RE = re.compile(r"^异议原话\s*·\s*识别线索\s*·\s*应对话术\s*·\s*素材锚点\s*")
+
+
+def _objection_backup(sources: list[tuple[Chunk, float]]) -> str:
+    """第五节附一条回复预案 (对方最可能回的异议), 素材取自异议处理库。
+
+    语料是 Markdown 表格, 摘录第一行会是表头「异议原话 · 识别线索 · …」,
+    对读简报的销售毫无信息量 —— 去掉表头再截断。
+    """
+    for i, (c, _s) in enumerate(sources, start=1):
+        if "objection-playbook" in (getattr(c, "path", "") or ""):
+            sn = _OBJECTION_HEADER_RE.sub("", _snippet(c.content, 140, drop=c.title))
+            if sn:
+                return f"- 回复预案（来源{i}）：{sn}"
+    return ""
+
+
 def build_offline_report(question: str, sources: list[tuple[Chunk, float]],
                          workflow: AgentWorkflow, role: str = "", ts: str = "") -> str:
     """LLM 不可用时, 用工作流自带的章节骨架生成结构化简报 (每部分标注来源编号)。"""
@@ -1134,13 +1165,25 @@ def build_offline_report(question: str, sources: list[tuple[Chunk, float]],
     lines.append("> 声明：本简报由检索式 agent 依据可访问文档自动生成，结论须人工复核后使用。")
     lines.append("")
 
-    # gtm_research 第一节交给确定性评分卡 (scorecard.py), 不再是「信号罗列」
+    # gtm_research 第一节交给确定性评分卡 (scorecard.py), 不再是「信号罗列」;
+    # 第五节交给确定性邮件模板 (outreach.py), 不再是「按关键词捞出来的话术片段」
     card = score_account(question) if workflow.id == "gtm_research" else None
+    draft = draft_outreach(card, _proof_ref(sources)) if card is not None else None
 
     for idx, (title, keywords) in enumerate(workflow.report_sections, start=1):
         lines.append(f"## {['一', '二', '三', '四', '五', '六'][idx - 1] if idx <= 6 else idx}、{title}")
         if idx == 1 and card is not None:
             lines.append(card.as_markdown())
+            lines.append("")
+            continue
+        if draft is not None and "首触邮件" in title:
+            lines.append(draft.as_markdown())
+            # 红线客户不附话术素材: 上面刚写完「不产出任何对外文案」,
+            # 下面再贴一段异议应对话术是自相矛盾的
+            if not draft.blocked:
+                backup = _objection_backup(sources)
+                if backup:
+                    lines.append(backup)
             lines.append("")
             continue
         # 按章节关键词在合并来源里选最相关的 2 条作为依据

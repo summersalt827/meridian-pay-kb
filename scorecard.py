@@ -118,6 +118,15 @@ class Scorecard:
     route: str = ""
     red_lines: list[str] = field(default_factory=list)
     signals: list[str] = field(default_factory=list)
+    # 下游槽位填充用的原始事实 (outreach.py 的邮件模板按这些填槽)。
+    # 与 dims 同源: 这些是「抽到的事实」, 不是「推断出的结论」,
+    # 下游只能引用, 不能反过来改分。
+    industry: str = ""
+    headcount: int | None = None
+    txn: int | None = None
+    funding: str = ""
+    expansion: str = ""
+    access: list[str] = field(default_factory=list)
 
     @property
     def disqualified(self) -> bool:
@@ -351,7 +360,9 @@ def score_account(question: str) -> Scorecard:
     ]
     total = sum(d.score for d in dims)
 
-    card = Scorecard(dims=dims, total=total, red_lines=reds)
+    card = Scorecard(dims=dims, total=total, red_lines=reds,
+                     industry=industry, headcount=headcount, txn=txn,
+                     funding=funding, expansion=expansion, access=access)
 
     # 信号摘要 (沿用原 _parse_account_signals 的口径, 保持输出连续)
     if headcount is not None:
