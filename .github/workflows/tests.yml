@@ -46,3 +46,5 @@ jobs:
         run: python3 test_gtm_scorecard.py
       - name: GTM outreach draft (deterministic email template, no invented numbers)
         run: python3 test_gtm_outreach.py
+      - name: Self-verification (do the README's claims still hold?)
+        run: python3 scripts/verify.py
