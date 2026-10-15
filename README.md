@@ -1,7 +1,7 @@
 # Meridian Pay 知识大脑 (KB-QA Agent Platform)
 
-> **Ask once. Every sub-question is permission-checked. Zero leaks — measured, not promised.**
-> 一次提问，多跳拆解；每个子问题都过权限；零泄露不是架构声明，是 26 项红队攻击实测的数字。
+> **Ask once. Every sub-question is permission-checked. Every identifier masked. Zero leaks — measured, not promised.**
+> 一次提问，多跳拆解；每个子问题都过权限、敏感标识进模型前逐条脱敏；零泄露不是架构声明，是 26 项红队攻击实测的数字。
 
 ![tests](https://github.com/summersalt827/meridian-pay-kb/actions/workflows/tests.yml/badge.svg)
 
@@ -44,6 +44,23 @@
   **子问题层级生效**——越权子问题检索为空；角色只由服务端令牌签发，请求体声明无效
 - 治理：/api/audit 与 /api/ask 身份只认 Bearer 令牌（无令牌 401 / 角色不足 403）
 
+**盾牌（第三道闸 · `shield.py`）**
+
+前两道门都不覆盖两类泄露，盾牌补上，且**只收窄、从不放宽**：
+
+- **need-to-know 脱敏**：你能看这份文档 ≠ 你需要看到里面那位客户的卡号。
+  进 LLM 前掩码卡号 / NRIC / FIN / IBAN / 银行账号 / 手机 / 邮箱 / 出生日期 /
+  护照 / 新加坡地址 / 凭证（凭证对 admin 也掩码）。
+  靠**校验而非猜长度**：卡号过 Luhn、IBAN 过 mod-97，所以「16 位但 Luhn 不过的
+  流水号」不会被误杀，而「形似 IBAN 但校验不过的编号」也不被误报。
+- **提示注入前置扫描**：文档是数据，不是指令（OWASP LLM01）。整行剔除
+  「忽略以上所有指令」「SYSTEM: new rule」「Note to AI assistants」等指令行
+  （中英文），伪造的 `[来源N]` 标签被中和（无法伪造上下文边界），零宽/隐藏字符清除。
+- **答案复检**：答案出模型后再扫一遍——模型凭空编出的卡号也会被拦下；
+  但用户自己输入的卡号保留（否则用户查自己的卡会被挡）。
+- **审计不成为第二个泄露面**：审计库落的是**全掩码**的问题与答案，
+  只记「规则与计数」，绝不记被掩码的明文。
+
 **审计与可观测**
 
 - SQLite 全量问答审计（WAL 模式，并发安全）+ 反馈闭环（有用/无用投票入库）
@@ -61,14 +78,27 @@ LLM 在边缘（规划、合成），确定性代码在核心（鉴权、RBAC、
 ```mermaid
 flowchart LR
   H["人 · 登录 / 提问 / 投票"] --> API["web_ui.py<br/>鉴权 401/403 · 限流"]
-  API --> PLAN["规划 LLM<br/>拆解子问题"] --> RBAC["RBAC<br/>子问题级"] --> RET["混合检索<br/>BM25+TF-IDF"] --> GATE["相关性门 0.17"] --> MERGE["合并去重"] --> SYNTH["合成 LLM<br/>带引用 / 简报+需人工决策"] --> API --> H
+  API --> PLAN["规划 LLM<br/>拆解子问题"] --> RBAC["RBAC<br/>子问题级"] --> RET["混合检索<br/>BM25+TF-IDF"] --> GATE["相关性门 0.17"] --> SHIELD["盾牌<br/>脱敏 + 注入剔除"] --> MERGE["合并去重"] --> SYNTH["合成 LLM<br/>带引用 / 简报+需人工决策"] --> RECHK["答案复检<br/>凭空产生的标识也拦"] --> API --> H
   RET --> DOCS[("sample_docs 16 篇 / 7 目录<br/>public/internal/gtm/compliance/risk/card_ops/finance")]
-  API --> DB[("SQLite WAL<br/>审计 + 反馈")]
+  API --> DB[("SQLite WAL<br/>审计 + 反馈（全掩码落库）")]
+
+  classDef gate fill:#fff3e0,stroke:#ef6c00,stroke-width:2px,color:#000
+  classDef shield fill:#eef2ff,stroke:#4338ca,stroke-width:2px,color:#000
+  class RBAC,GATE,RECHK gate
+  class SHIELD shield
 ```
+
+三道闸的职责边界（都在确定性代码里，LLM 永远不参与判定）：
+
+| 闸 | 回答的问题 | 不回答 |
+|---|---|---|
+| RBAC（子问题级） | 这份文档你能不能看 | 里面的卡号你该不该看 |
+| 披露门（audience） | 这句话能不能当着客户说 | 文档里的文字能不能给模型下指令 |
+| 盾牌（need-to-know + 注入） | 卡号要不要掩码、这行是不是指令 | 谁有权限（那是 RBAC 的事） |
 
 > 演示语料 `sample_docs/` 为虚构 Meridian Pay（B2B fintech）数据，角色、文档与审计记录均为演示用途（honest simulation）。
 
-## 评测（七套，139 断言 — 2026-10-14 全绿）
+## 评测（八套，171 断言 — 2026-10-15 全绿）
 
 | 套件 | 用例 | 断言 | 结果 | 关键数字 |
 |------|------|------|------|----------|
@@ -79,8 +109,13 @@ flowchart LR
 | test_redteam.py | 26 | **红队对抗**：语义改写 8 + 提示注入 4 + 路径逃逸 2 + 角色伪造 4 + 多跳拼图泄漏 3 + 阈值压制 2 + 反作弊回归 3 | 26/26 ✅ | **26 种攻击零泄漏**（报告见 [RED-TEAM-REPORT](docs/RED-TEAM-REPORT.md)） |
 | test_audit_chain.py | 6 | **审计防篡改**：append-only 触发器拦截 UPDATE/DELETE + SHA-256 链重算定位篡改行 + 旧库迁移回填 | 6/6 ✅ | 篡改必被定位（能力⑥ worked example） |
 | test_disclosure.py | 11 | **客户在场披露门**：对外语境零泄漏 + 可对外内容零漏检（防退化）+ 只收窄不放宽 + 多跳子问题级生效 | 11/11 ✅ | 同一问题：内部 4 文档 → 客户在场仅 case-studies |
+| test_shield.py | 32 | **盾牌**：掩码正确性 10 例（含「Luhn 不过的长数字必不掩码」「校验不过的 IBAN 必不掩码」反向断言）+ 注入扫描 7 例（中英文注入/伪标签/零宽 + **正常文本必不被误删**）+ 端到端 15 例（上下文/答案/审计/复检/不绕过 RBAC） | 32/32 ✅ | 8 类标识全掩码、2 行注入全剔除、业务结论完整保留 |
 
 评测轴对齐行业框架：0 role violations、0 PII leaks、faithfulness 100%（0 幻觉引用）。
+
+> **成对断言**是本套件的硬要求：只测「卡号被掩码」的话，一个把所有数字全掩码的
+> 实现也能通过；必须同时测「Luhn 无效的 16 位数字不被掩码」和「正常业务文本不被误删」，
+> 才能证明是**精确拦截**而不是**粗暴糊住**。
 
 实测延迟（本机 → DeepSeek chat，12 次实测，2026-10-13）：**中位 1038ms · p90 1202ms**（全链路含 LLM 调用）。
 
@@ -113,16 +148,48 @@ Claude Code 负责补丁合并、四套评测质量门与 UI 打磨——完整�
 | VaultRAG ACL 前置检索 | ACL 谓词进检索查询，越权 chunk 不进流程 | 同属 pre-retrieval 过滤（OWASP LLM08 推荐），另加**绝对可比相关性门**（0.17 标定）——能区分「内容存在但你没权限」和「内容不存在」 |
 | RAGFlow / LightRAG 图谱编译 | 图索引增强多跳 | 我们选混合检索 + 标定门（同等召回、可测试性更强）；图谱编译列为 roadmap |
 | 通用 RAG demo | 无权限概念，撞词就答 | 宁可 no_context，不给没有依据的答案（诚实拒绝卡） |
+| 企业 RAG 的 PII 处理 | 多为「模型回答完再过滤」，或干脆不处理 | 脱敏发生在**进 LLM 之前**，答案出模型后**再复检**一遍；审计库本身也是全掩码落库，不成为第二个泄露面 |
 
 ## 评审速览（For judges）
 
+### 赛题 7 项硬性要求 → 完成度（手册 §2）
+
+> 逐条对照 Aspire 出题原文。**7 项中 5 项完整实现、2 项部分实现**——边界主动标出来，
+> 因为对持牌金融机构的评审而言，说清自己没做到什么，本身就是 Responsible AI 的一部分。
+
+| # | 官方要求 | 状态 | 机制 | 边界 / 已实现到哪 |
+|---|---|---|---|---|
+| 1 | 统一自然语言查询，单一有引用的答案 | ✅ 完整 | 多跳规划 → 子问题各自检索 → 合并合成；每个来源带路径 / 平台 / 分数 | — |
+| 2 | 权限感知检索：过滤在 LLM **之前**，不压平平台权限模型 | ⚠️ **部分** | 过滤位置正确：pre-retrieval ACL 在检索阶段生效，**子问题级**过闸（比文档级更细）；金标评测 leak = 0 | 过滤机制已实现并被测到 leak=0，但连接器是插槽，**未在真实平台权限模型上端到端验证**——见下方「关于演示语料」 |
+| 3 | 数据新鲜度：有界窗口（分钟 ~ 1 小时），不静默提供过期内容 | ✅ 完整 | `POST /api/resync` 按需重扫 + `KB_RESYNC_MINUTES` 定时窗口；引用卡片带文档 mtime「更新于」 | — |
+| 4 | 负面权限案例：拒绝时不泄露受限内容**存在** | ✅ 完整 | 越权子问题检索为空 → `no_context` 拒绝卡；对外语境下内部文档既不进答案、也不进来源列表，无元数据侧信道 | — |
+| 5 | 实时权限变更：吊销在后续查询即时生效 | ⚠️ **部分** | 令牌内嵌角色，校验时与账号当前角色比对（角色一变，旧令牌立即 401）；23 项鉴权攻击面用例覆盖 | **角色**变更即时生效 ✅；**文档级**权限变更依赖 resync 窗口，无每查询回源校验 |
+| 6 | 审计查询：防篡改、完整、可查询，合规官可重建 | ✅ 完整 | SQLite WAL 全量审计 + append-only 触发器 + SHA-256 哈希链（重算可定位篡改行）；admin-only API + 聚合看板 | — |
+| 7 | LLM 泄露缓解：减少幻觉与编造 | ✅ 完整 | 回答只基于过门来源（0 幻觉引用）；无来源宁拒不留；**答案复检**——出模型后再扫一遍，凭空编出的卡号同样拦下 | — |
+
+**关于演示语料（第 2 项「部分」的说明）**：语料是 16 篇本地 Markdown，平台徽章一律带 `·demo`
+标记，API 返回 `demo_corpus: true`。这是**刻意的范围选择，不是未完成的掩饰**——把验证资源集中
+在权限与审计的形式化不变量上（这些可以在 CI 里被 171 条断言反复证明），而非连接器实现上。
+换成真实 Confluence / Jira 连接器时，每一道闸门、每一套测试、每一条不变量都不需要改动。
+
+**超出官方 7 项的补充**（Aspire 是持牌金融机构，PII 是硬要求，手册未单列）：
+need-to-know 最小知情（进 LLM **之前**掩码 11 类标识，靠 Luhn / mod-97 校验而非长度猜测）·
+间接提示注入防护（OWASP LLM01）· 审计库全掩码落库，自身不成为第二个泄露面。
+
 - **[需求映射表](docs/requirements-map.md)** — Aspire 出题每条要求 → 机制 → 文档 → 可见产物；
   10 个评审维度（10×10 分）→ 证据对照
-- 提交要件：WorkBuddy 证明（会话①-⑤ + 12 张截图，[AI-COLLABORATION.md](docs/AI-COLLABORATION.md)）✅ · blurb 7 词 ✅ · 封面 16:9 380×216 ✅
+- 提交要件：WorkBuddy 证明（会话①-⑤ + 12 张截图，[AI-COLLABORATION.md](docs/AI-COLLABORATION.md)）✅ · blurb 8 词（全仓库统一：`Ask anything. RBAC decides. Shield masks. You audit.`）✅ · 封面 16:9 380×216 ✅
 
 ### 30 秒体验路径（live demo）
 
-> 线上地址：**`https://<your-app>.onrender.com`**（Render 部署后替换此行；本地体验用 `http://localhost:8000`）
+> ⚠️ **提交前必做（唯一未完成的提交项）**：线上地址还是占位符，Render 部署后
+> **必须**替换成真实 URL 再交表 —— 「Project link」是手册里的 bonus 分项，
+> 而「30 秒体验路径」的整个叙事都建立在评委真的能打开它。
+> 本地体验用 `http://localhost:8000`。
+>
+> ```
+> https://<your-app>.onrender.com        ← 替换此行
+> ```
 
 | 步 | 操作 | 看到什么 |
 |---|---|---|
@@ -135,8 +202,12 @@ Claude Code 负责补丁合并、四套评测质量门与 UI 打磨——完整�
 | 7 | 登回 alice，打开审计抽屉，点「验证链」 | 全量留痕：谁问了什么、被拦了什么、基于哪篇文档；SHA-256 哈希链一键重算验证防篡改 |
 | 8 | 进阶：登录 `cara`（合规官）问「可疑交易上报的时限是多少？」→ 命中合规文档；换 `erin`（卡运营）同问 → 拦截 | 金融岗位 × 目录权限矩阵的第二个对比镜头 |
 | 9 | 进阶：改 `sample_docs/` 任一文档后，登录 `alice` 调 `POST /api/resync`，再问同一问题 | 新内容可答，引用卡带「更新于 HH:MM」——官方 worked example「数据新鲜度」 |
+| 10 | **盾牌**：`python3 scripts/demo_shield.py` | 同一份含 PII 与注入的争议记录，三段对照：关盾牌（模型看到明文卡号 + 注入指令）→ 开盾牌（8 类标识全变标签、2 行注入被剔除、业务结论保留）→ 答案复检（模型凭空编的卡号也被拦下）。脚本自带 8 条自检，改代码后不会悄悄失效 |
 
-也可一条命令重放全部 9 个场景并截图：`KB_DEMO_URL=<你的URL> python3 screenshot_demo.py`
+也可一条命令重放步骤 1–9 并截图（第 10 步是本地脚本，不经过服务）：`KB_DEMO_URL=<你的URL> python3 screenshot_demo.py`
+
+> 第 10 步用独立语料目录 `demo_docs/`（不在 `sample_docs/` 内），
+> 因此不参与相关性门的 27 组标定样本，不会影响任何评测套件的分数。
 
 ## 运行
 
@@ -180,6 +251,7 @@ ping `/api/health` 保活。**免费层冷启动约 20-60 秒**：评委首访�
 
 ```
 kb_qa.py            主系统（摄入/混合检索/相关性门/RBAC/审计/多跳 agent/工作流注册表）
+shield.py           盾牌（need-to-know 脱敏 + 提示注入前置扫描 + 答案复检）
 web_ui.py           Web 服务（标准库 http.server，鉴权接入，0.0.0.0 + PORT）
 auth.py             身份认证（PBKDF2 口令 + HMAC 令牌 + 吊销）
 static/index.html   聊天界面（登录/工作流选择器/规划块/平台徽章/审计看板/反馈）
@@ -189,6 +261,7 @@ test_auth.py        认证攻击面评测（23 用例，自起服务）
 test_web_matrix.py  Web 层矩阵（44 用例，含 8 金融岗位 + 5 数据新鲜度 + 审计链验证权限）
 test_audit_chain.py 审计哈希链（append-only 触发器 + 链重算定位篡改）
 test_disclosure.py 客户在场披露门（audience 分级：对外零泄漏 + 零漏检）
+test_shield.py     盾牌套件（脱敏 + 注入扫描 + 答案复检，32 断言，含反向断言）
 test_redteam.py     红队对抗套件（26 项攻击检查，零泄漏；跑前服务需以 KB_LOGIN_RATE_LIMIT=200 启动）
 docs/requirements-map.md  需求映射表（Aspire brief → 机制 → 证据 + 评审维度对照）
 docs/architecture.md  架构与信任边界（mermaid 流水线 + 三区职责表）
@@ -197,7 +270,26 @@ docs/UX-ACCESSIBILITY-AUDIT.md  无障碍审计（WCAG 2.2 AA 对比度实测 + 
 docs/AI-COLLABORATION.md  AI 协作分工叙事（WorkBuddy 主构建 + Claude Code 合并验证）
 docs/build-sessions/  WorkBuddy 会话①-⑤ prompt 全文 + 9/26 试跑对话记录
 scripts/demo_path.py  demo 路径 e2e 证明（三角色命中/拦截/审计/401/403）
-.github/workflows/  CI：每次 push 跑七套 139 断言（无需 LLM key）
+scripts/demo_shield.py  盾牌对照演示（关/开盾牌 + 答案复检，自带 8 条自检）
+.github/workflows/  CI：每次 push 跑八套 171 断言（无需 LLM key）
 证据/               WorkBuddy 聊天截图 12 张 + 本机演示截图 8 张 + 封面图
 sample_docs/        Meridian Pay 语料 16 篇（public/internal/gtm/compliance/risk/card_ops/finance；gtm 含 LAARC 异议库+信号定义库，虚构数据）
+demo_docs/          盾牌演示语料（含 PII 与注入的争议记录），独立目录不参与标定
 ```
+
+## 已知边界（honest boundary）
+
+不藏着的短板，评委问到也有答案：
+
+- **语料是演示数据**：16 篇虚构 Markdown；平台徽章标着 Confluence/Drive/Jira，
+  实际是**代码常量映射而非实时连接器**——因此徽章一律带 `·demo` 后缀，
+  `/api/health` 也返回 `demo_corpus: true`。连接器是真实设计的插槽
+  （统一 ingest 契约 + 平台常量表），但数据源这一层没接真平台。
+- **纯词法检索**：BM25 + TF-IDF，没有 embedding/cross-encoder。
+  同义改写靠 `QUERY_SYNONYMS` 兜底，长查询里的专名/虚词会压低相关性分
+  （语料越小越明显）。生产路径是加 cross-encoder 重排——见
+  `self_ceiling()` 注释里实测过的取舍。
+- **盾牌靠规则不靠模型**：可被改写成不含扫描词表的注入绕过；
+  剩余防线是「LLM 无写路径 + 答案复检 + 审计留痕」。
+  名字检测仅覆盖被标注/带称谓的人名，街道名不覆盖。
+- **掩码粒度**：新加坡格式（NRIC/FIN/手机号/邮编）为主，其他国家证件按护照/IBAN 通用规则。
