@@ -20,7 +20,7 @@ answer** — no OAuth allowlists, no setup steps. Three layers protect every ans
 sub-question-level RBAC, an audience disclosure gate for customer-present
 conversations, and a need-to-know shield that masks identifiers *before* retrieved text
 reaches the model. Every number in this submission is reproduced by CI on every push
-(8 suites, 171 assertions, all green).
+(ten suites, 337 assertions, all green).
 
 ## Real-world insights
 
@@ -85,7 +85,7 @@ internal-only document — the story that gets the CRO's sign-off, not just IT's
 the compliance officer, the shield closes the gap that document-level ACL leaves open:
 a permitted document no longer hands the model a customer's card number, and the audit
 trail they reconstruct is itself masked, so producing evidence does not create new
-exposure. And trust is measurable, not asserted: 171 assertions across eight suites —
+exposure. And trust is measurable, not asserted: 337 assertions across ten suites —
 leak rate 0, recall loss 0, 26 adversarial attacks with zero leaks, 32 shield checks
 including the paired ones that prove precision (a number failing Luhn is *not* masked;
 normal business text is *not* over-stripped) — all reproduced by GitHub Actions on
