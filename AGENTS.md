@@ -5,7 +5,7 @@
 ## 运行与测试
 
 - 启动：`python3 web_ui.py`（LLM 模式需 `LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`；鉴权默认 token 模式，演示账号 alice/sam/bob 口令 meridian-demo）
-- **提交前必跑十套**：`python3 test_rbac.py && python3 test_relevance.py && python3 test_auth.py && python3 test_web_matrix.py && python3 test_redteam.py && python3 test_audit_chain.py && python3 test_disclosure.py && python3 test_shield.py && python3 test_gtm_scorecard.py && python3 test_gtm_outreach.py`（全绿才可提交；CI 会跑同样十套共 332 断言）
+- **提交前必跑十套**：`python3 test_rbac.py && python3 test_relevance.py && python3 test_auth.py && python3 test_web_matrix.py && python3 test_redteam.py && python3 test_audit_chain.py && python3 test_disclosure.py && python3 test_shield.py && python3 test_gtm_scorecard.py && python3 test_gtm_outreach.py`（全绿才可提交；CI 会跑同样十套共 337 断言）
 - 前端改动后做 JS 冒烟：提取 `<script>` 内容跑 `node --check`
 - 盾牌改动后跑对照演示自检：`python3 scripts/demo_shield.py`（自带 8 条自检）
 
@@ -21,10 +21,14 @@
 7. **盾牌在进 LLM 之前生效**：任何新增的检索→生成路径（含离线抽取式回退）都必须过 `shield.sanitize_for_llm`，否则等于开了一条绕过口
 8. **评分卡不得交回模型打分**：gtm_research 的 Fit/Timing/Access/Intent 与 tier 由 `scorecard.py` 按 icp-targeting.md §6 确定性算出后注入 prompt；改动评分规则必须同步 §6 文档与 test_gtm_scorecard.py 的档位断言
 9. **缺事实 ≠ 不追**：评分卡里「事实齐全但低分 → 不追」与「事实不全 → 待补事实」是两种终止，不可合并；前者是判断，后者是没问清楚。合并会把谨慎伪装成安全
-8. 审计落库的是**全掩码**的问题与答案；审计只记「规则与计数」，禁止记被掩码的明文
-9. `self_ceiling()` 里 OOV 词抬高上界是**刻意保留**的（去掉会让无关提问分数从 0.15 涨到 0.73，阈值失效），不要「优化」掉它
-10. **对外文案不编数字**：`outreach.py` 的每一句都来自 icp-targeting.md §8 与 case-studies 的既有话术，新增行业画像/交付物必须同步 `template_numbers()` 能覆盖的数字与 test_gtm_outreach.py 的 F 组断言
-11. **红线不产出对外文案**：命中不追清单时第五节必须为空且声明「不生成」，不得为了「章节完整」而生成邮件
+10. 审计落库的是**全掩码**的问题与答案；审计只记「规则与计数」，禁止记被掩码的明文
+11. `self_ceiling()` 里 OOV 词抬高上界是**刻意保留**的（去掉会让无关提问分数从 0.15 涨到 0.73，阈值失效），不要「优化」掉它
+12. **对外文案不编数字**：`outreach.py` 的每一句都来自 icp-targeting.md §8 与 case-studies 的既有话术，新增行业画像/交付物必须同步 `template_numbers()` 能覆盖的数字与 test_gtm_outreach.py 的 F 组断言
+13. **红线不产出对外文案**：命中不追清单时第五节必须为空且声明「不生成」，不得为了「章节完整」而生成邮件
+14. **演示模式（`?demo=1`）不得成为旁路**：它只能预填公开演示口令与按顺序引导，
+    每一步都必须走真实的 `/api/login` + `/api/ask`；禁止为演示签发匿名/特权令牌、
+    禁止在服务端开「演示态」分支（`/` 与 `/?demo=1` 必须返回同一份 HTML）。
+    改动演示脚本要同步跑 `test_web_matrix.py` 的 D1–D5
 
 ## 架构速查
 

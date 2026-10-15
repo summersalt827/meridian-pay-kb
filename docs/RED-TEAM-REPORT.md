@@ -43,4 +43,4 @@ python3 test_shield.py                         # 32 checks (G–J + end-to-end),
 python3 scripts/demo_shield.py                 # side-by-side: shield off vs on, self-verifying
 ```
 
-CI runs all ten suites (332 assertions) on every push — `python3 test_redteam.py` included. The shield suite (`test_shield.py`, 32 assertions) extends the adversarial surface beyond authorization: identifier masking and indirect prompt injection, each with a paired "must not over-trigger" assertion.
+CI runs all ten suites (337 assertions) on every push — `python3 test_redteam.py` included. The shield suite (`test_shield.py`, 32 assertions) extends the adversarial surface beyond authorization: identifier masking and indirect prompt injection, each with a paired "must not over-trigger" assertion.

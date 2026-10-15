@@ -19,7 +19,7 @@ flowchart LR
     PLAN["Planner<br/>decompose into sub-questions"]
     SYNTH["Synthesis<br/>cited answer / account briefing<br/>+ human-decisions list"]
   end
-  subgraph D["Deterministic — pure code · 10 suites / 332 assertions (CI)"]
+  subgraph D["Deterministic — pure code · 10 suites / 337 assertions (CI)"]
     RBAC["RBAC at sub-question level<br/>allowed_dirs + audience disclosure gate"]
     RET["Hybrid retrieval<br/>BM25 + TF-IDF"]
     GATE["Relevance gate 0.17<br/>absolute comparable score"]

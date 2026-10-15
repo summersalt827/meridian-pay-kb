@@ -76,7 +76,7 @@ we filter evidence **pre-retrieval** — and add the dimension it does not model
 ## 5. Measured, not promised
 
 Every claim in this document is reproduced by CI on every push — ten suites,
-**332 assertions** (RBAC gold standard, relevance calibration on 27 labelled samples,
+**337 assertions** (RBAC gold standard, relevance calibration on 27 labelled samples,
 auth attack surface, 44-case web matrix, 26-check red team, audit hash chain,
 disclosure gate, shield, GTM scorecard, GTM outreach draft),
 all green on GitHub Actions (2026-10-15).
