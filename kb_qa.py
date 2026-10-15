@@ -44,6 +44,7 @@ from typing import Iterable
 import numpy as np
 
 from shield import ShieldStats, mask_identifiers, rescan_answer, sanitize_for_llm, scan_values
+from scorecard import score_account
 
 # requests 为可选依赖 (仅接入 LLM/稠密向量时需要); 延迟导入以保持离线零额外依赖
 
@@ -1075,58 +1076,49 @@ ROUTE_AE_MONTHLY_TXN = 200           # 月跨境付款 > 200 笔 -> AE 直跟
 ROUTE_SDR_MONTHLY_TXN = 50           # 50-200 笔 -> SDR 跟进
 
 
-def _parse_account_signals(question: str) -> list[str]:
-    """从调研请求里抽取客户信号 (确定性正则, 不依赖 LLM)。"""
-    q = question or ""
-    out: list[str] = []
-
-    m_head = re.search(r"(\d+)\s*人", q)
-    headcount = int(m_head.group(1)) if m_head else None
-    m_txn = re.search(r"(\d+)\s*笔", q)
-    txn = int(m_txn.group(1)) if m_txn else None
-    m_round = re.search(r"(种子|天使|A|B|C|D|E)\s*轮", q)
-    funding = m_round.group(1) + " 轮" if m_round else ""
-    m_region = re.search(r"(东南亚|新加坡|马来西亚|印尼|越南|泰国|菲律宾|出海|海外)", q)
-    region = m_region.group(1) if m_region else ""
-
-    if headcount is not None:
-        if headcount >= TIER_ENTERPRISE_HEADCOUNT:
-            tier = f"企业客户层（≥{TIER_ENTERPRISE_HEADCOUNT} 人）"
-        elif headcount >= TIER_MID_HEADCOUNT:
-            tier = f"中端市场（{TIER_MID_HEADCOUNT}-{TIER_ENTERPRISE_HEADCOUNT} 人）"
-        else:
-            tier = f"SMB（<{TIER_MID_HEADCOUNT} 人）"
-        out.append(f"规模信号：约 {headcount} 人 → {tier}")
-    else:
-        out.append("规模信号：问题未给出人数，需人工补充")
-
-    if txn is not None:
-        if txn > ROUTE_AE_MONTHLY_TXN:
-            route = f"AE 直跟（月跨境付款 > {ROUTE_AE_MONTHLY_TXN} 笔，24 小时内首触）"
-        elif txn >= ROUTE_SDR_MONTHLY_TXN:
-            route = f"SDR 跟进（{ROUTE_SDR_MONTHLY_TXN}-{ROUTE_AE_MONTHLY_TXN} 笔，初筛后转 AE）"
-        else:
-            route = f"自助通道（< {ROUTE_SDR_MONTHLY_TXN} 笔）"
-        out.append(f"用量信号：月均 {txn} 笔跨境付款 → {route}")
-    else:
-        out.append("用量信号：问题未给出月付款笔数，需人工补充")
-
-    if funding:
-        out.append(f"资本信号：{funding} 融资 → 扩张期高优先级线索（预算与决策速度通常更好）")
-    else:
-        out.append("资本信号：问题未提及融资轮次，需人工补充")
-
-    if region:
-        out.append(f"扩张信号：{region} → 新市场 / 新主体，命中优先级信号（加分项）")
-    else:
-        out.append("扩张信号：问题未提及新市场，需人工补充")
-
-    return out
+def _title_leaf(title: str) -> str:
+    """分块标题的最后一段 (「页面名 / 小节名」-> 「小节名」), 用于去正文重复前缀。"""
+    return (title or "").split("/")[-1].strip()
 
 
-def _snippet(text: str, limit: int = 180) -> str:
-    """单行化并截断文本, 用于简报里的依据摘录。"""
-    s = " ".join((text or "").split())
+def _snippet(text: str, limit: int = 180, drop: str = "") -> str:
+    """单行化 + Markdown 降噪 + 截断, 用于简报里的依据摘录。
+
+    降噪是必要的: 语料正文是 Markdown, 直接摘录会把 `## 二、分层路由规则`
+    和 `| 套餐 | 月费 |` 这类标记原样搬进简报, 读起来像日志而不是情报。
+    表格行转成「a · b」而不是留一堆管道符。
+
+    drop: 可选, 去掉开头与 chunk 标题重复的部分。分块标题形如
+    「页面名 / 小节名」, 而正文又以同一小节标题开头, 不去掉就会
+    「分层路由规则 二、分层路由规则 二、分层路由规则」。
+    """
+    s = text or ""
+    # 逐行处理, 保留语料里的列表结构
+    lines: list[str] = []
+    for raw in s.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if set(line) <= set("|-: "):          # 表格分隔行, 直接丢掉
+            continue
+        line = re.sub(r"^#{1,6}\s*", "", line)          # 去掉标题井号
+        line = line.replace("**", "").replace("`", "")  # 粗体 / 行内码
+        if line.startswith("|"):                        # 表格行 -> 顿号分隔
+            cells = [c.strip() for c in line.strip("|").split("|") if c.strip()]
+            line = " · ".join(cells)
+        elif line.startswith(("-", "*")):
+            line = "• " + line.lstrip("-* ").strip()
+        lines.append(line)
+    s = " ".join(lines)
+    s = re.sub(r"\s{2,}", " ", s).strip()
+    if drop:
+        # 正文实际是「完整标题」+「## 小节名」两行开头, 所以要剥两轮:
+        # 先整条标题 (页面名 / 小节名), 再小节名。
+        d = re.sub(r"\s+", " ", drop).strip()
+        leaf = d.split("/")[-1].strip()
+        for cand in (d, leaf, d, leaf):
+            if cand and s.startswith(cand):
+                s = s[len(cand):].lstrip(" ·-—")
     return s[:limit] + "…" if len(s) > limit else s
 
 
@@ -1142,11 +1134,15 @@ def build_offline_report(question: str, sources: list[tuple[Chunk, float]],
     lines.append("> 声明：本简报由检索式 agent 依据可访问文档自动生成，结论须人工复核后使用。")
     lines.append("")
 
+    # gtm_research 第一节交给确定性评分卡 (scorecard.py), 不再是「信号罗列」
+    card = score_account(question) if workflow.id == "gtm_research" else None
+
     for idx, (title, keywords) in enumerate(workflow.report_sections, start=1):
         lines.append(f"## {['一', '二', '三', '四', '五', '六'][idx - 1] if idx <= 6 else idx}、{title}")
-        if idx == 1:
-            for s in _parse_account_signals(question):
-                lines.append(f"- {s}")
+        if idx == 1 and card is not None:
+            lines.append(card.as_markdown())
+            lines.append("")
+            continue
         # 按章节关键词在合并来源里选最相关的 2 条作为依据
         kw = set(tokenize(keywords))
         ranked = sorted(
@@ -1160,7 +1156,7 @@ def build_offline_report(question: str, sources: list[tuple[Chunk, float]],
         for num, c in picked:
             lines.append(
                 f"- 依据 来源{num}（{getattr(c, 'doc_source', DEFAULT_DOC_SOURCE)} "
-                f"{c.path}）：{_snippet(c.content)}"
+                f"{c.path}）：{_snippet(c.content, drop=c.title)}"
             )
         lines.append("")
 
@@ -1476,7 +1472,8 @@ class KnowledgeBase:
             answer_text, mode = NO_CONTEXT_ANSWER, "no_context"
         else:
             answer_text, mode = self._synthesize(question, merged, wf,
-                                                 stats=stats, per_source=per_source)
+                                                 stats=stats, per_source=per_source,
+                                                 user=user, ts=ts)
         # 出模型后的复检 (多跳同理: 合并后的答案只许含用户自己输入过的标识)
         answer_text = rescan_answer(answer_text, set(), scan_values(question), stats)
 
@@ -1577,21 +1574,40 @@ class KnowledgeBase:
 
     def _synthesize(self, question: str, sources: list[tuple[Chunk, float]],
                     wf: AgentWorkflow, stats: ShieldStats | None = None,
-                    per_source: list[int] | None = None) -> tuple[str, str]:
-        """合成步: LLM 优先 (用工作流的 synth_prompt), 否则离线结构化 / 抽取式回退。"""
+                    per_source: list[int] | None = None,
+                    user: User | None = None, ts: str = "") -> tuple[str, str]:
+        """合成步: LLM 优先 (用工作流的 synth_prompt), 否则离线结构化 / 抽取式回退。
+
+        gtm_research 走确定性评分卡: 分数由 scorecard.py 算出后作为既成事实注入
+        prompt, LLM 只负责组织语言, 不能改分 —— 评分卡承诺了「四维各 0-25、
+        总分 100、映射 tier」, 让模型自由发挥等于把这个承诺交给概率。
+        """
+        synth_prompt = wf.synth_prompt
+        if wf.id == "gtm_research":
+            card = score_account(question)
+            synth_prompt = (
+                f"{wf.synth_prompt}\n\n"
+                "【确定性评分卡 · 已由代码按 gtm/icp-targeting.md §6 算出，严禁修改任何分数】\n"
+                "下面这一节是既成事实，你必须原样采用并放进「一、公司概况与信号评分卡」，\n"
+                "不得重新打分、不得调整任何数字、不得因为你「觉得」更高而改写 tier。\n\n"
+                f"{card.as_markdown()}\n"
+            )
         if self.generator.llm_ready() and self.cfg.plan_mode != "offline":
             try:
-                return self.generator.synthesize(question, sources, wf.synth_prompt,
+                return self.generator.synthesize(question, sources, synth_prompt,
                                                  stats=stats, per_source=per_source), "llm"
             except Exception as e:
-                return self._offline_answer(question, sources, wf) + f"\n\n(LLM 不可用: {e})", "extractive"
-        return self._offline_answer(question, sources, wf), "extractive"
+                return (self._offline_answer(question, sources, wf, user=user, ts=ts)
+                        + f"\n\n(LLM 不可用: {e})"), "extractive"
+        return self._offline_answer(question, sources, wf, user=user, ts=ts), "extractive"
 
     def _offline_answer(self, question: str, sources: list[tuple[Chunk, float]],
-                        wf: AgentWorkflow) -> str:
+                        wf: AgentWorkflow, user: User | None = None,
+                        ts: str = "") -> str:
         """离线合成: 有章节骨架则出结构化简报, 否则退回抽取式摘要。"""
         if wf.report_sections:
-            return build_offline_report(question, sources, wf)
+            return build_offline_report(question, sources, wf,
+                                        role=(user.role if user else ""), ts=ts)
         return Generator._extractive(question, sources)
 
 

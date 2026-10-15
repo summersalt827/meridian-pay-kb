@@ -42,3 +42,5 @@ jobs:
         run: python3 test_disclosure.py
       - name: Shield (need-to-know masking + prompt-injection scan)
         run: python3 test_shield.py
+      - name: GTM scorecard (deterministic scoring, reproducible)
+        run: python3 test_gtm_scorecard.py
