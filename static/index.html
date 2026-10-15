@@ -420,6 +420,46 @@
   .pill.wf-gtm { background: var(--purple-soft); color: var(--purple); border-color: #DDD6FE; }
   .empty-row { text-align: center; color: var(--muted); padding: 32px 0; }
   .err-row { text-align: center; color: #B91C1C; padding: 24px 0; }
+
+  /* ---------- 移动端适配 (iPhone 等小屏) ---------- */
+  @media (max-width: 720px) {
+    html, body { height: 100%; }
+    @supports (height: 100dvh) {
+      html, body { height: 100dvh; }   /* iOS 键盘弹起时视口不塌陷 */
+    }
+    header { padding: 8px 12px; gap: 8px; }
+    .brand-text p { display: none; }
+    .badges { gap: 4px; }
+    .badge-ok { font-size: 10px; padding: 2px 8px; }
+    .badges .badge-ok:nth-child(n+3) { display: none; }  /* 手机只留前 2 枚徽章 */
+    .identity { width: 100%; margin-left: 0; justify-content: flex-end; }
+    .field label { display: none; }
+    .field input { width: 92px; font-size: 16px; }   /* 16px 防 iOS 聚焦自动缩放 */
+    .audit-btn { padding: 8px 12px; }
+    main { padding: 14px 10px 8px; }
+    .hero { padding: 26px 16px 20px; border-radius: 16px; }
+    .hero h2 { font-size: 20px; }
+    .hero-sub { font-size: 12.5px; }
+    .feat { font-size: 12px; padding: 5px 12px; }
+    .bubble { max-width: 88%; }
+    .demo-bar { padding: 8px 12px; }
+    footer {
+      padding: 10px 10px calc(10px + env(safe-area-inset-bottom));  /* 避开 iPhone 底部横条 */
+    }
+    .composer { gap: 8px; }
+    .composer textarea {
+      font-size: 16px;          /* iOS 聚焦不自动缩放 */
+      min-height: 46px;         /* 更大的触控目标 */
+      padding: 12px 13px;
+    }
+    .send { height: 46px; padding: 0 18px; font-size: 15px; }
+    .tip { display: none; }
+    .seg-foot .seg-hint { display: none; }
+    .mask { padding: 12px; }
+    .drawer { max-height: 92vh; }
+    .drawer-body { padding: 0 12px 12px; }
+    td.q { max-width: 140px; }
+  }
 </style>
 </head>
 <body>
