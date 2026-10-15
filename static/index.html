@@ -421,28 +421,37 @@
   .empty-row { text-align: center; color: var(--muted); padding: 32px 0; }
   .err-row { text-align: center; color: #B91C1C; padding: 24px 0; }
 
+  /* [hidden] 必须真的隐藏 —— .chips 等类的 display 会盖过 UA 默认规则,
+     否则 footer 里 hidden 的 chipsFoot 在移动端渲染成一大块 */
+  [hidden] { display: none !important; }
+
   /* ---------- 移动端适配 (iPhone 等小屏) ---------- */
   @media (max-width: 720px) {
     html, body { height: 100%; }
     @supports (height: 100dvh) {
       html, body { height: 100dvh; }   /* iOS 键盘弹起时视口不塌陷 */
     }
-    header { padding: 8px 12px; gap: 8px; }
+    header { padding: 8px 12px; gap: 6px; }
     .brand-text p { display: none; }
+    .brand-text h1 { font-size: 14px; }
     .badges { gap: 4px; }
     .badge-ok { font-size: 10px; padding: 2px 8px; }
     .badges .badge-ok:nth-child(n+3) { display: none; }  /* 手机只留前 2 枚徽章 */
-    .identity { width: 100%; margin-left: 0; justify-content: flex-end; }
+    .identity { width: 100%; margin-left: 0; justify-content: flex-start; gap: 6px; }
     .field label { display: none; }
-    .field input { width: 92px; font-size: 16px; }   /* 16px 防 iOS 聚焦自动缩放 */
-    .audit-btn { padding: 8px 12px; }
-    main { padding: 14px 10px 8px; }
+    .field input { width: 78px; font-size: 16px; }   /* 16px 防 iOS 聚焦自动缩放 */
+    .health { display: none; }                        /* 索引信息桌面专属 */
+    .role-hint { max-width: 96px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
+    .audit-btn { padding: 8px 12px; font-size: 12.5px; }
+    .demo-bar { padding: 6px 10px; gap: 6px; font-size: 11.5px; flex-wrap: nowrap; }
+    .demo-step { flex: 1 1 0%; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .demo-btn { padding: 4px 9px; font-size: 11.5px; white-space: nowrap; }
+    main { padding: 14px 10px 8px; min-height: 0; }
     .hero { padding: 26px 16px 20px; border-radius: 16px; }
     .hero h2 { font-size: 20px; }
     .hero-sub { font-size: 12.5px; }
     .feat { font-size: 12px; padding: 5px 12px; }
     .bubble { max-width: 88%; }
-    .demo-bar { padding: 8px 12px; }
     footer {
       padding: 10px 10px calc(10px + env(safe-area-inset-bottom));  /* 避开 iPhone 底部横条 */
     }
