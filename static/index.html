@@ -92,6 +92,25 @@
   }
   .health b { color: var(--blue); font-weight: 600; }
 
+  /* ---------- 演示模式条 (?demo=1) ---------- */
+  .demo-bar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 8px 16px; background: var(--purple-soft);
+    border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--ink);
+  }
+  .demo-tag {
+    font-size: 11px; font-weight: 700; color: #fff; background: var(--brand2);
+    border-radius: 999px; padding: 2px 8px; white-space: nowrap;
+  }
+  .demo-step { flex: 1 1 340px; min-width: 240px; }
+  .demo-step b { color: var(--blue); font-weight: 600; }
+  .demo-btn {
+    font: inherit; font-size: 12px; cursor: pointer; padding: 4px 10px;
+    border-radius: 8px; border: 1px solid var(--blue); color: #fff; background: var(--blue);
+  }
+  .demo-btn.ghost { color: var(--blue); background: var(--blue-soft); }
+  .demo-btn:disabled { opacity: .55; cursor: default; }
+
   .audit-btn {
     font: inherit; font-size: 13px; font-weight: 600;
     color: var(--blue); background: var(--blue-soft);
@@ -443,6 +462,15 @@
   </div>
 </header>
 
+<!-- 演示模式条: 仅 ?demo=1 时出现。它只预填公开的演示口令并按顺序引导,
+     不签发令牌、不跳过登录、不绕过 RBAC —— 每一步都走真实的 /api/login + /api/ask -->
+<div class="demo-bar" id="demoBar" hidden>
+  <span class="demo-tag">演示模式</span>
+  <span class="demo-step" id="demoStep"></span>
+  <button class="demo-btn" id="demoNext">下一步 →</button>
+  <button class="demo-btn ghost" id="demoClose">退出演示</button>
+</div>
+
 <main id="main">
   <div class="thread" id="thread" role="log" aria-live="polite" aria-relevant="additions">
     <div class="empty" id="empty">
@@ -537,6 +565,10 @@
   var hintEl     = document.getElementById("roleHint");
   var healthEl   = document.getElementById("health");
   var auditBtn   = document.getElementById("auditBtn");
+  var demoBar    = document.getElementById("demoBar");
+  var demoStep   = document.getElementById("demoStep");
+  var demoNext   = document.getElementById("demoNext");
+  var demoClose  = document.getElementById("demoClose");
   var maskEl     = document.getElementById("mask");
   var drawerEl   = document.getElementById("drawer");
   var auditBody  = document.getElementById("auditBody");
@@ -966,7 +998,9 @@
     addError((msg || "登录已失效") + "，请重新登录");
   }
 
-  function doLogin() {
+  // after: 登录成功后的回调 (演示模式靠它接着提问)。事件监听器会把 Event 传进来,
+  // 下面用 typeof 判断挡掉, 所以 addEventListener("click", doLogin) 依然安全。
+  function doLogin(after) {
     var username = (userEl.value || "").trim();
     var password = passEl.value || "";
     if (!username || !password) { hintEl.hidden = false; hintEl.textContent = "请输入用户名与口令"; return; }
@@ -989,6 +1023,7 @@
         passEl.value = "";
         setSession(res.data);
         inputEl.focus();
+        if (typeof after === "function") after();
       })
       .catch(function (err) {
         loginBtn.disabled = false;
@@ -998,10 +1033,10 @@
       });
   }
 
-  function doLogout() {
+  function doLogout(after) {
     fetch("/api/logout", { method: "POST", headers: authHeaders({}) })
       .catch(function () {})
-      .then(function () { clearSession(); });
+      .then(function () { clearSession(); if (typeof after === "function") after(); });
   }
 
   loginBtn.addEventListener("click", doLogin);
@@ -1051,7 +1086,7 @@
         thinking.row.remove();
         addError(String(err));
       })
-      .then(function () { setBusy(false); });
+      .then(function () { setBusy(false); if (demoMode) demoStepDone(); });
   }
 
   sendBtn.addEventListener("click", function () { send(inputEl.value); });
@@ -1188,6 +1223,75 @@
     if (e.key === "Escape" && !maskEl.hidden) closeAudit();
   });
 
+  // ---------- 演示模式 (?demo=1) ----------
+  // 评委打开 ?demo=1 后被牵着走完六步。每一步都走真实的 /api/login + /api/ask,
+  // 所以 sam 那一步看到的 no_context 是服务端真拦下来的, 不是前端演出来的。
+  // 它唯一"特殊"的地方是预填演示口令 —— 那个口令 README 里本来就写着, 不是密钥。
+  var DEMO_PW = "meridian-demo";
+  var DEMO_STEPS = [
+    { user: "alice", wf: "knowledge_qa", q: "薪酬带宽是多少？",
+      note: "admin 命中 <b>internal/roadmap</b>：来源卡片 + 平台徽章 + 多跳规划块" },
+    { user: "sam", wf: "knowledge_qa", q: "薪酬带宽是多少？",
+      note: "自动换成 sales 问<b>同一句</b>：干净 no_context 拒绝卡 —— RBAC 真拦，且不泄露文档存在" },
+    { user: "sam", wf: "knowledge_qa", q: "大客户报价折扣能批到几折？",
+      note: "仍在 sales 权限内：命中 <b>gtm/pricing</b>" },
+    { user: "sam", wf: "gtm_research", q: "计划拓展东南亚，帮我做账户情报分析并给路由建议",
+      note: "账户情报六节：确定性评分卡 + ICP 路由 + <b>确定性首触邮件草稿</b>（无 LLM key 也完整）" },
+    { user: "sam", wf: "knowledge_qa", q: "客户问我们有没有同类案例，以及能给多少折扣", ext: true,
+      note: "自动勾选<b>客户在场</b>：内部定价与话术被披露门拦下，只剩 case-studies" },
+    { user: "alice", wf: "knowledge_qa", q: "可疑交易上报的时限是多少？",
+      note: "换回 admin：打开右上角<b>审计日志</b>，上面每一步的留痕都在，可一键验证哈希链" }
+  ];
+  var demoMode = false, demoIdx = 0, demoBusy = false;
+
+  function demoNote(i) {
+    var s = DEMO_STEPS[i];
+    if (!s) return "六步走完了 —— 点「重新开始」再来一遍，或「退出演示」自己提问";
+    return "第 " + (i + 1) + "/" + DEMO_STEPS.length + " 步（" + s.user + "）：" + s.note;
+  }
+
+  function demoRender() {
+    demoStep.innerHTML = demoNote(demoIdx);
+    demoNext.textContent = demoIdx >= DEMO_STEPS.length ? "重新开始" : "下一步 →";
+    demoNext.disabled = demoBusy;
+  }
+
+  function demoStepDone() {          // 一问一答结束后指针前移, 只更新提示, 不替评委发下一句
+    demoBusy = false;
+    demoIdx += 1;
+    demoRender();
+  }
+
+  function demoRun() {
+    if (demoBusy || busy) return;
+    if (demoIdx >= DEMO_STEPS.length) { demoIdx = 0; demoRender(); return; }
+    var step = DEMO_STEPS[demoIdx];
+    demoBusy = true;
+    demoRender();
+
+    // 客户在场开关: 演示模式只切这个开关, 读权限仍由服务端按令牌判定
+    if (!!step.ext !== extToggle.checked) {
+      extToggle.checked = !!step.ext;
+      extToggle.dispatchEvent(new Event("change"));
+    }
+    switchWorkflow(step.wf);
+
+    var ask = function () { send(step.q); };
+    var loginAsStepUser = function () {
+      userEl.value = step.user;
+      passEl.value = DEMO_PW;
+      doLogin(ask);                  // 真实登录, 不是伪造身份; 失败就停在登录提示上
+    };
+    if (session.user === step.user && session.token) { ask(); return; }
+    if (session.token) { doLogout(loginAsStepUser); } else { loginAsStepUser(); }
+  }
+
+  demoNext.addEventListener("click", demoRun);
+  demoClose.addEventListener("click", function () {
+    demoBar.hidden = true;
+    demoMode = false;                // 退出后不再推进步骤, 但已登录的会话照常可用
+  });
+
   // ---------- 启动: 恢复会话 + 健康检查 ----------
   // authMode 由 /api/health 下发: anonymous 表示服务端关闭了鉴权 (仅本地演示)
   var authMode = "token";
@@ -1221,6 +1325,18 @@
       healthEl.textContent = "服务未连接";
       syncIdentity();
     });
+
+  // ?demo=1 -> 演示模式: 预填第一个演示账号与公开口令, 并显示引导条
+  (function initDemo() {
+    try {
+      if (new URLSearchParams(location.search).get("demo") !== "1") return;
+      demoMode = true;
+      demoBar.hidden = false;
+      userEl.value = DEMO_STEPS[0].user;
+      passEl.value = DEMO_PW;
+      demoRender();
+    } catch (e) { /* 不支持 URLSearchParams 的浏览器: 静默退回普通模式 */ }
+  })();
 
   switchWorkflow(currentWf);      // 初始化工作流选择器与 chips (含输入区副本)
   autoGrow();
