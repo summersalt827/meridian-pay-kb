@@ -40,3 +40,9 @@ jobs:
         run: python3 test_audit_chain.py
       - name: Disclosure gate (customer-present mode)
         run: python3 test_disclosure.py
+      - name: Shield (need-to-know masking + prompt-injection scan)
+        run: python3 test_shield.py
+      - name: GTM scorecard (deterministic scoring, reproducible)
+        run: python3 test_gtm_scorecard.py
+      - name: GTM outreach draft (deterministic email template, no invented numbers)
+        run: python3 test_gtm_outreach.py

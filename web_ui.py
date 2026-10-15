@@ -69,6 +69,7 @@ from auth import (  # noqa: E402
 )
 from kb_qa import (  # noqa: E402  (需先补 sys.path)
     DEFAULT_WORKFLOW_ID,
+    DEMO_CORPUS,
     WORKFLOWS,
     Config,
     KnowledgeBase,
@@ -392,6 +393,8 @@ class KBHandler(BaseHTTPRequestHandler):
             "workflows": list(VALID_WORKFLOWS),                              # 可用工作流
             "workflow_names": {w.id: w.name for w in WORKFLOWS.values()},    # 展示名映射
             "auth_mode": "token" if self._auth_enabled() else "anonymous",   # 是否需要登录
+            # 语料来源标注: true = 平台名由代码常量映射(演示语料), 非实时连接器
+            "demo_corpus": bool(DEMO_CORPUS),
             "demo_accounts": sorted(self.directory.accounts) if self.directory else [],
             "last_ingest_ts": kb.last_ingest_ts,
             "resync_minutes": self.web_cfg.resync_minutes,
@@ -691,9 +694,13 @@ class KBHandler(BaseHTTPRequestHandler):
                     "source": s.get("source") or "Confluence",   # 来源平台 (Confluence/Drive/Jira)
                     "mtime": s.get("mtime"),                     # 文档更新时间 (新鲜度展示)
                     "audience": s.get("audience") or "internal",  # 披露分级 (客户在场门的前端徽章)
+                    "redacted": int(s.get("redacted") or 0),     # 该来源被盾牌掩码的标识条数
+                    "source_kind": s.get("source_kind") or "demo-mapping",  # 真实连接器 / 演示映射
                 }
                 for s in sources
             ],
+            # 盾牌统计: 掩码计数 + 被剔除的注入行数 (只记计数, 不记明文)
+            "shield": getattr(ans, "shield", None) or {"redacted": {}, "instructions_removed": 0},
             "user": ans.user,
             "role": role,
             "agent": agent_effective,            # 本次是否多跳生效 (子问题数 > 1)
