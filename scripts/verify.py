@@ -290,7 +290,8 @@ def v7_submission() -> None:
     full = len(re.findall(r"✅ 完整", req))
     part = len(re.findall(r"⚠️ \*\*部分\*\*", req))
     check("V7.4 赛题 7 项：5 完整 / 2 部分（README 与映射表说法一致）",
-          full == 5 and part == 2 and "5 项完整实现" in readme,
+          full == 5 and part == 2 and (
+              "5 项完整实现" in readme or "5 of 7 fully implemented" in readme),
           f"映射表实测 {full} 完整 / {part} 部分")
     check("V7.5 主动标注边界（不追清单/演示语料都写在明处）",
           "demo_corpus" in readme or "演示语料" in readme)
