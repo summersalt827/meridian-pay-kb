@@ -200,6 +200,9 @@ need-to-know 最小知情（进 LLM **之前**掩码 11 类标识，靠 Luhn / m
 
 - **[需求映射表](docs/requirements-map.md)** — Aspire 出题每条要求 → 机制 → 文档 → 可见产物；
   10 个评审维度（10×10 分）→ 证据对照
+- **[关键设计取舍](docs/DECISIONS.md)** — 提交要件 "key design trade-offs"：5 条反直觉决定，
+  每条写明被否掉的替代方案和为什么（子问题级 RBAC 为何不在检索前过滤 / 为何不用 embedding /
+  为何不让模型打分 / 演示语料为何是刻意范围 / 盾牌为何放在检索后 LLM 前）
 - 提交要件：WorkBuddy 证明（会话①-⑤ + 12 张截图，[AI-COLLABORATION.md](docs/AI-COLLABORATION.md)）✅ · blurb 8 词（全仓库统一：`Ask anything. RBAC decides. Shield masks. You audit.`）✅ · 封面 16:9 380×216 ✅
 
 ### 30 秒体验路径（live demo）
@@ -281,6 +284,7 @@ test_shield.py     盾牌套件（脱敏 + 注入扫描 + 答案复检，32 断�
 test_gtm_scorecard.py  评分卡套件（可复现性 + 规则正确性 + 红线优先 + 缺事实处理，56 断言）
 test_redteam.py     红队对抗套件（26 项攻击检查，零泄漏；跑前服务需以 KB_LOGIN_RATE_LIMIT=200 启动）
 docs/requirements-map.md  需求映射表（Aspire brief → 机制 → 证据 + 评审维度对照）
+docs/DECISIONS.md  关键设计取舍（5 条反直觉决定 + 被否掉的替代方案）
 docs/architecture.md  架构与信任边界（mermaid 流水线 + 三区职责表）
 docs/RED-TEAM-REPORT.md  红队报告（攻击矩阵 + 每组的"为什么"）
 docs/UX-ACCESSIBILITY-AUDIT.md  无障碍审计（WCAG 2.2 AA 对比度实测 + 已应用修复）
@@ -288,7 +292,7 @@ docs/AI-COLLABORATION.md  AI 协作分工叙事（WorkBuddy 主构建 + Claude C
 docs/build-sessions/  WorkBuddy 会话①-⑤ prompt 全文 + 9/26 试跑对话记录
 scripts/demo_path.py  demo 路径 e2e 证明（三角色命中/拦截/审计/401/403）
 scripts/demo_shield.py  盾牌对照演示（关/开盾牌 + 答案复检，自带 8 条自检）
-.github/workflows/  CI：每次 push 跑八套 171 断言（无需 LLM key）
+.github/workflows/  CI：每次 push 跑十套 332 断言（无需 LLM key）
 证据/               WorkBuddy 聊天截图 12 张 + 本机演示截图 9 张 + 封面图
 sample_docs/        Meridian Pay 语料 16 篇（public/internal/gtm/compliance/risk/card_ops/finance；gtm 含 LAARC 异议库+信号定义库，虚构数据）
 demo_docs/          盾牌演示语料（含 PII 与注入的争议记录），独立目录不参与标定
