@@ -2,6 +2,9 @@
 
 [English version / 英文版](README.md)
 
+**🔴 线上可点开：[meridian-pay-kb.onrender.com](https://meridian-pay-kb.onrender.com)** ·
+演示账号 `alice` / 口令 `meridian-demo` · **评委一键演示（六步自动走完）：[`?demo=1`](https://meridian-pay-kb.onrender.com/?demo=1)**
+
 > **Ask once. Every sub-question is permission-checked. Every identifier masked. Zero leaks — measured, not promised.**
 > 一次提问，多跳拆解；每个子问题都过权限、敏感标识进模型前逐条脱敏；零泄露不是架构声明，是 26 项红队攻击实测的数字。
 
@@ -116,14 +119,14 @@ flowchart LR
 
 > 演示语料 `sample_docs/` 为虚构 Meridian Pay（B2B fintech）数据，角色、文档与审计记录均为演示用途（honest simulation）。
 
-## 评测（十套，332 断言 — 2026-10-15 全绿）
+## 评测（十套，337 断言 — 2026-10-15 全绿）
 
 | 套件 | 用例 | 断言 | 结果 | 关键数字 |
 |------|------|------|------|----------|
 | test_rbac.py | 8 | 金标准：leak rate = 0 + recall 漏检 = 0（成对断言） | 8/8 ✅ | **leak rate = 0 · recall 漏检 = 0** |
 | test_relevance.py | 21 | 无关必 no_context + 正样本必命中 + 分数可分性（0.17 标定） | 21/21 ✅ | 无关最高 0.1492 < 0.17 < 命中最低 0.2464（余量 1.14x / 1.45x） |
 | test_auth.py | 23 | 认证攻击面：无令牌/伪造角色/篡改 payload/登出吊销/越权入口 | 23/23 ✅ | 23 攻击面用例全绿 |
-| test_web_matrix.py | 44 | 18 组角色矩阵 + 审计权限 + agent 工作流用例 + **8 金融岗位用例**（合规/风控/卡运营/财务）+ **5 数据新鲜度用例**（resync 权限 + 重扫 worked example）+ 审计链验证权限 | 44/44 ✅ | 全矩阵全绿 |
+| test_web_matrix.py | 49 | 18 组角色矩阵 + 审计权限 + agent 工作流用例 + **8 金融岗位用例**（合规/风控/卡运营/财务）+ **5 数据新鲜度用例**（resync 权限 + 重扫 worked example）+ 审计链验证权限 + **5 演示模式用例**（`?demo=1` 不成为旁路） | 49/49 ✅ | 全矩阵全绿 |
 | test_redteam.py | 26 | **红队对抗**：语义改写 8 + 提示注入 4 + 路径逃逸 2 + 角色伪造 4 + 多跳拼图泄漏 3 + 阈值压制 2 + 反作弊回归 3 | 26/26 ✅ | **26 种攻击零泄漏**（报告见 [RED-TEAM-REPORT](docs/RED-TEAM-REPORT.md)） |
 | test_audit_chain.py | 6 | **审计防篡改**：append-only 触发器拦截 UPDATE/DELETE + SHA-256 链重算定位篡改行 + 旧库迁移回填 | 6/6 ✅ | 篡改必被定位（能力⑥ worked example） |
 | test_disclosure.py | 11 | **客户在场披露门**：对外语境零泄漏 + 可对外内容零漏检（防退化）+ 只收窄不放宽 + 多跳子问题级生效 | 11/11 ✅ | 同一问题：内部 4 文档 → 客户在场仅 case-studies |
@@ -136,6 +139,8 @@ flowchart LR
 评分卡为什么单列一套：它测的不只是「分数对不对」。只测正确性的话，一个把所有不确定输入都判成「不追」的实现也能满分——那是把谨慎伪装成安全。因此 D 组专门断言「缺事实 ≠ 不追」，C 组专门构造「分数很高但命中红线」的输入逼红线优先于分数。
 
 邮件草稿为什么也单列一套：它测的也不只是「能不能生成」。只测结构完整的话，一个对所有客户输出同一封邮件（换个公司名）的实现也能满分——那是把模板伪装成个性化。因此 C 组断言 tier / 行业 / 最强信号三者各自都会改变产出，F 组断言正文里每个数字都能指回模板常量或用户事实，D 组断言命中红线时**一个字都不产出**（给制裁名单主体写首触邮件，写得再合规也是事故）。
+
+演示模式（`?demo=1`）为什么也要测：它最容易变成绕过鉴权的后门——「给评委看」是各种跳过登录的理由里最正当的一个。D1 断言 `/` 与 `/?demo=1` 返回**同一份 HTML**（服务端根本没有演示态分支），D3 断言无令牌提问仍是 401，D4/D5 把演示脚本里最关键的两句钉死（sales 问同一句必被拦、客户在场只剩 case-studies）——免得评委现场看到的和脚本写的不一样。
 
 > **成对断言**是本套件的硬要求：只测「卡号被掩码」的话，一个把所有数字全掩码的
 > 实现也能通过；必须同时测「Luhn 无效的 16 位数字不被掩码」和「正常业务文本不被误删」，
@@ -193,7 +198,7 @@ Claude Code 负责补丁合并、评测质量门与 UI 打磨——完整分工�
 
 **关于演示语料（第 2 项「部分」的说明）**：语料是 16 篇本地 Markdown，平台徽章一律带 `·demo`
 标记，API 返回 `demo_corpus: true`。这是**刻意的范围选择，不是未完成的掩饰**——把验证资源集中
-在权限与审计的形式化不变量上（这些可以在 CI 里被 332 条断言反复证明），而非连接器实现上。
+在权限与审计的形式化不变量上（这些可以在 CI 里被 337 条断言反复证明），而非连接器实现上。
 换成真实 Confluence / Jira 连接器时，每一道闸门、每一套测试、每一条不变量都不需要改动。
 
 **超出官方 7 项的补充**（Aspire 是持牌金融机构，PII 是硬要求，手册未单列）：
@@ -202,14 +207,18 @@ need-to-know 最小知情（进 LLM **之前**掩码多类标识，靠 Luhn / mo
 
 - **[需求映射表](docs/requirements-map.md)** — Aspire 出题每条要求 → 机制 → 文档 → 可见产物；
   10 个评审维度（10×10 分）→ 证据对照
-- **[关键设计取舍](docs/DECISIONS.md)** — 提交要件 "key design trade-offs"：5 条反直觉决定，
-  每条写明被否掉的替代方案和为什么（子问题级 RBAC 为何不在检索前过滤 / 为何不用 embedding /
-  为何不让模型打分 / 演示语料为何是刻意范围 / 盾牌为何放在检索后 LLM 前）
+- **[关键设计取舍](docs/DECISIONS.md)** — 六条取舍，每条写清「选了什么 / 放弃了什么 /
+  **代价**是什么 / 哪条测试盯着它」（含 OOV 词必须计入 BM25 上界的实测反例）
 - 提交要件：WorkBuddy 证明（会话①-⑤ + 12 张截图，[AI-COLLABORATION.md](docs/AI-COLLABORATION.md)）✅ · blurb 8 词（全仓库统一：`Ask anything. RBAC decides. Shield masks. You audit.`）✅ · 封面 16:9 380×216 ✅
 
 ### 30 秒体验路径（live demo）
 
 > 线上地址：**https://meridian-pay-kb.onrender.com**（实测空闲 16 分钟后仍秒回；本地体验用 `http://localhost:8000`）
+>
+> **赶时间就直接开 [`?demo=1`](https://meridian-pay-kb.onrender.com/?demo=1)**：顶部出现演示条，
+> 点「下一步」它会自己换账号、切工作流、提问——六步走完 RBAC 拦截、账户情报、客户在场披露门。
+> 它只预填口令并按顺序引导，**每一步都走真实的 `/api/login` + `/api/ask`**，
+> 所以 sales 那一步看到的 `no_context` 是服务端真拦下来的，不是前端演的（`test_web_matrix.py` D1–D5 盯着这点）。
 
 | 步 | 操作 | 看到什么 |
 |---|---|---|
@@ -275,11 +284,11 @@ scorecard.py        GTM 确定性评分卡（Fit/Timing/Access/Intent → tier�
 outreach.py         GTM 确定性首触邮件草稿（tier/行业/最强信号填槽，红线不产出文案）
 web_ui.py           Web 服务（标准库 http.server，鉴权接入，0.0.0.0 + PORT）
 auth.py             身份认证（PBKDF2 口令 + HMAC 令牌 + 吊销）
-static/index.html   聊天界面（登录/工作流选择器/规划块/平台徽章/审计看板/反馈）
+static/index.html   聊天界面（登录/工作流选择器/规划块/平台徽章/审计看板/反馈 + `?demo=1` 演示引导条）
 test_rbac.py        金标准评测（leak=0 + recall=100%）
 test_relevance.py   相关性门标定评测（21 用例）
 test_auth.py        认证攻击面评测（23 用例，自起服务）
-test_web_matrix.py  Web 层矩阵（44 用例，含 8 金融岗位 + 5 数据新鲜度 + 审计链验证权限）
+test_web_matrix.py  Web 层矩阵（49 用例，含 8 金融岗位 + 5 数据新鲜度 + 5 演示模式 + 审计链验证权限）
 test_audit_chain.py 审计哈希链（append-only 触发器 + 链重算定位篡改）
 test_disclosure.py 客户在场披露门（audience 分级：对外零泄漏 + 零漏检）
 test_shield.py     盾牌套件（脱敏 + 注入扫描 + 答案复检，32 断言，含反向断言）
@@ -287,7 +296,7 @@ test_gtm_scorecard.py  评分卡套件（可复现性 + 规则正确性 + 红线
 test_gtm_outreach.py   邮件草稿套件（可复现性 + 槽位填充 + 红线边界 + 不编数字，105 断言）
 test_redteam.py     红队对抗套件（26 项攻击检查，零泄漏；跑前服务需以 KB_LOGIN_RATE_LIMIT=200 启动）
 docs/requirements-map.md  需求映射表（Aspire brief → 机制 → 证据 + 评审维度对照）
-docs/DECISIONS.md  关键设计取舍（5 条反直觉决定 + 被否掉的替代方案）
+docs/DECISIONS.md      关键设计取舍（六条：评分卡不让模型打分 / 词法检索默认 / OOV 计入上界 / 盾牌用规则 / 演示语料 / SQLite 哈希链，每条含代价）
 docs/architecture.md  架构与信任边界（mermaid 流水线 + 三区职责表）
 docs/RED-TEAM-REPORT.md  红队报告（攻击矩阵 + 每组的"为什么"）
 docs/UX-ACCESSIBILITY-AUDIT.md  无障碍审计（WCAG 2.2 AA 对比度实测 + 已应用修复）
@@ -295,7 +304,7 @@ docs/AI-COLLABORATION.md  AI 协作分工叙事（WorkBuddy 主构建 + Claude C
 docs/build-sessions/  WorkBuddy 会话①-⑤ prompt 全文 + 9/26 试跑对话记录
 scripts/demo_path.py  demo 路径 e2e 证明（三角色命中/拦截/审计/401/403）
 scripts/demo_shield.py  盾牌对照演示（关/开盾牌 + 答案复检，自带 8 条自检）
-.github/workflows/  CI：每次 push 跑十套 332 断言（无需 LLM key）
+.github/workflows/  CI：每次 push 跑十套 337 断言（无需 LLM key）
 证据/               WorkBuddy 聊天截图 12 张 + 本机演示截图 9 张 + 封面图
 sample_docs/        Meridian Pay 语料 16 篇（public/internal/gtm/compliance/risk/card_ops/finance；gtm 含 LAARC 异议库+信号定义库，虚构数据）
 demo_docs/          盾牌演示语料（含 PII 与注入的争议记录），独立目录不参与标定

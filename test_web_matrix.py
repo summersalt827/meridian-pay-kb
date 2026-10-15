@@ -94,7 +94,6 @@ def login_raw(username: str) -> str:
     if status != 200 or not data.get("token"):
         raise SystemExit(f"登录失败 ({username}): HTTP {status} {data.get('error', '')}")
     return data["token"]
-    return data["token"]
 
 
 def ask(question: str, role: str, token: str, agent: bool = False,
@@ -392,6 +391,77 @@ def main() -> int:
         if os.path.exists(probe_abs):
             os.unlink(probe_abs)
         _request("POST", "/api/resync", {}, token=tokens["admin"])   # 恢复索引到原状态
+
+    # ============ 第七部分: 演示模式 (?demo=1) 不得成为旁路 (10/15 新增, 5 用例) ============
+    # 前端那条引导条只做两件事: 预填公开演示口令、按顺序提示。这里断言服务端没有配套后门,
+    # 并把脚本里最关键的两句钉死 —— 免得评委现场看到的和脚本写的不一样。
+    print("\n== 第七部分: 演示模式 (?demo=1) 不绕过任何一道闸")
+
+    # D1 服务端不认识 ?demo=1: 带给不带返回同一份 HTML (不存在"演示态"分支)
+    html_plain = ""
+    total += 1
+    try:
+        with urllib.request.urlopen(BASE + "/", timeout=30) as r1:
+            html_plain = r1.read().decode()
+        with urllib.request.urlopen(BASE + "/?demo=1", timeout=30) as r2:
+            html_demo = r2.read().decode()
+        ok = html_plain == html_demo and "demoBar" in html_plain
+        if ok:
+            passed += 1
+            print("  ✅ D1 ?demo=1 由前端解析: 两份 HTML 完全一致, 服务端无演示态分支")
+        else:
+            failures.append("D1 ?demo=1 与 / 返回不一致或缺少 demoBar")
+            print("  ❌ D1 ?demo=1 与 / 返回不一致或缺少 demoBar")
+    except Exception as exc:  # pragma: no cover
+        failures.append(f"D1 取首页失败: {exc}")
+        print(f"  ❌ D1 取首页失败: {exc}")
+
+    # D2 页面里只有公开演示口令, 没有任何硬编码令牌/密钥
+    total += 1
+    has_demo_pw = DEMO_PASSWORD in html_plain
+    has_secret = ("eyJ" in html_plain) or ("sk-" in html_plain)
+    if has_demo_pw and not has_secret:
+        passed += 1
+        print("  ✅ D2 页面含公开演示口令, 但不含任何硬编码令牌/密钥")
+    else:
+        failures.append(f"D2 演示口令={has_demo_pw} 硬编码凭据={has_secret}")
+        print(f"  ❌ D2 演示口令={has_demo_pw} 硬编码凭据={has_secret}")
+
+    # D3 未登录提问仍 401 —— 演示模式不签发匿名令牌
+    total += 1
+    status, _d = _request("POST", "/api/ask",
+                          {"question": "薪酬带宽是多少？", "agent": True}, token=None)
+    if status == 401:
+        passed += 1
+        print("  ✅ D3 无令牌提问仍 401: 演示模式不签发匿名令牌")
+    else:
+        failures.append(f"D3 无令牌提问返回 {status}, 期望 401")
+        print(f"  ❌ D3 无令牌提问返回 {status}, 期望 401")
+
+    # D4 演示脚本第 2 步: 换 sales 问同一句必被拦 (no_context + 零来源)
+    total += 1
+    status, data = ask("薪酬带宽是多少？", "sales", tokens["sales"])
+    blocked = status == 200 and data.get("mode") == "no_context" and not data.get("sources")
+    if blocked:
+        passed += 1
+        print("  ✅ D4 演示第 2 步: sales 问同一句 → no_context 且零来源")
+    else:
+        failures.append(f"D4 演示第 2 步未按脚本被拦: mode={data.get('mode')}")
+        print(f"  ❌ D4 演示第 2 步未按脚本被拦: mode={data.get('mode')}")
+
+    # D5 演示脚本第 5 步: 客户在场时只剩可对外文档
+    total += 1
+    status, data = _request("POST", "/api/ask",
+                            {"question": "客户问我们有没有同类案例，以及能给多少折扣",
+                             "agent": True, "external_context": True}, token=tokens["sales"])
+    paths = sorted({s.get("path", "") for s in data.get("sources", [])})
+    ok = status == 200 and bool(paths) and all("case-studies" in p for p in paths)
+    if ok:
+        passed += 1
+        print(f"  ✅ D5 演示第 5 步: 客户在场只剩 {paths}")
+    else:
+        failures.append(f"D5 客户在场未只剩可对外文档: {paths}")
+        print(f"  ❌ D5 客户在场未只剩可对外文档: {paths}")
 
     print(f"\n== 结果: {passed}/{total} 通过")
     if failures:

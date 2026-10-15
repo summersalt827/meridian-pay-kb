@@ -1,43 +1,95 @@
 # Key Design Trade-offs
 
-Five decisions a reviewer is likely to question. Each states the alternative we rejected and why.
+> The submission asks for "architecture diagram + trust boundaries + key design trade-offs". The trust boundaries are in [`architecture.md`](architecture.md); this document is the **trade-offs** — each states what we chose, what we rejected, **what it costs**, and which tests pin it.
+>
+> This is not a complete ADR log (we do not have a 13-entry decision record); these are the **six decisions a reviewer should most check** — each corresponds to a real failure or a deliberate refusal, not an after-the-fact justification.
 
-## 1. Sub-question RBAC after scoring, not ACL-prefixed retrieval
+How to read it: the **cost** column is the point. A trade-off is only credible if its cost is written down — a decision with "no cost" is usually one that has not been thought through.
 
-**Decision.** A decomposed query retrieves each sub-question independently against a directory-scoped corpus, then filters by the absolute relevance gate. We do not push ACL predicates into the retrieval query itself (the VaultRAG pattern).
+---
 
-**Alternative rejected.** ACL-prefixed retrieval guarantees out-of-scope chunks never enter the pipeline, but it silently degrades: asking the wrong question returns visible-but-irrelevant results, indistinguishable from "you lack permission".
+## D1 · The scorecard is computed by code; the model does not grade
 
-**Why ours.** Our design can tell the two apart: out-of-scope content yields a clean `no_context` rejection, never a confident fabrication from keyword collisions. The gold-standard suite asserts both directions — `leak rate = 0` **and** `recall loss = 0` (8/8), so the filter is proven not to over-block.
+| | |
+|---|---|
+| **Decision** | The Fit / Timing / Access / Intent scores in `gtm_research` are computed by `scorecard.py` from the existing rules in `sample_docs/gtm/icp-targeting.md` §6; the LLM is demoted to narrator |
+| **Rejected** | Letting the LLM grade directly (more flexible; absorbs vague, colloquial customer descriptions) |
+| **Why** | "Auditable" and "model-graded" conflict directly: the same customer profile scored 86 and 72 on two runs — sales cannot double-check it and compliance gets no evidence. Every point must trace to a concrete clause (e.g. "Series B+ → 20–25"), otherwise the score is just a well-phrased opinion |
+| **Cost** | Signals outside the written clauses score nothing; input must contain structured facts (industry / headcount / funding round / monthly payment volume) — purely descriptive input lands on "collect facts" instead of an approximate score |
+| **Evidence** | `test_gtm_scorecard.py`, 56 assertions: reproducibility 4 (same input, 5 runs, same score) · clause traceability 12 · **red line overrides score** 8 · **missing facts ≠ do-not-pursue** 8 |
 
-## 2. Lexical hybrid retrieval with a calibrated gate, not embeddings-first
+> Group D exists on purpose: correctness-only tests would be passed by an implementation that judges every uncertain input "do-not-pursue" — that is caution disguised as safety. Missing facts must score 0 and be marked "needs human input", with a hard distinction between "complete facts, genuinely low score → a judgment" and "incomplete facts, low score → simply not asked yet".
 
-**Decision.** BM25 + TF-IDF over mixed CN/EN tokenisation, ranked by an absolute relevance score (`BM25 / query self-match ceiling`) with a 0.17 threshold calibrated on 27 labelled samples (irrelevant ≤0.1492, relevant ≥0.2464 — 1.14x / 1.45x margin).
+---
 
-**Alternative rejected.** Dense embeddings as the default retriever. A `DenseEmbedder` exists behind `USE_DENSE_EMBED=1`, but embeddings rescore the whole ranking and would force re-calibrating the gate — the gate's separation is the moat; swapping the ranker risks it for an unmeasured gain on a 16-document corpus.
+## D2 · Retrieval defaults to lexical (BM25 + TF-IDF); dense embeddings are a switch, not the default
 
-**Known boundary (stated honestly).** Single-keyword queries sit near the lexical ceiling; the production path is a cross-encoder rerank, listed as future work rather than hidden.
+| | |
+|---|---|
+| **Decision** | Pure lexical retrieval by default; dense vectors behind a switch (`USE_DENSE_EMBED=1` + `EMBED_MODEL`, see `kb_qa.py` config) |
+| **Rejected** | Vector retrieval by default (better synonym recall, friendlier to long-tail questions) |
+| **Why** | ① **Reproducible**: CI and a judge's own machine need no embedding service or key — all ten suites, 337 assertions, pass in an empty environment; ② **Controllable**: permission filtering must happen at retrieval time (pre-retrieval ACL, OWASP LLM08), and the combination of a lexical index with ACL is far easier to pin with assertions; ③ **Corpus size**: 16 documents / 96 chunks — lexical is sufficient, and the mixed CN/EN tokenisation (single chars + bigrams) behaves predictably |
+| **Cost** | Synonym rewrites rely on `QUERY_SYNONYMS` (query-side only; the corpus is untouched); proper nouns and function words in long queries depress the relevance score, more visibly on a small corpus |
+| **Evidence** | The 0.17 gate calibrated on 27 labelled samples with three fully separated classes (irrelevant ≤0.145 / weak ≤0.152 / answerable ≥0.244); `test_relevance.py`, 21 assertions, guards the margin (irrelevant max 0.1492 < 0.17 < relevant min 0.2464) |
 
-## 3. Deterministic scoring and drafting; the LLM narrates, it does not grade
+---
 
-**Decision.** The GTM scorecard (`scorecard.py`) and first-touch email draft (`outreach.py`) are computed by code from the rules already written in `gtm/icp-targeting.md` §6. The LLM receives the scores as established facts and is instructed not to alter them.
+## D3 · Out-of-vocabulary words **must** count toward the BM25 ceiling
 
-**Alternative rejected.** Letting the model grade and draft freely. Two runs would then produce different scores with no traceable provenance per point — a direct conflict with the auditability claim the whole product rests on, and a compliance problem in a fintech sales context.
+| | |
+|---|---|
+| **Decision** | `BM25.self_ceiling()` — when the query itself is scored as a document to compute the ceiling, words with df=0 still accumulate |
+| **Rejected** | Accumulating only words that exist in the corpus (looks more "correct": why should absent words contribute to the ceiling?) |
+| **Why** | **Measured counter-example**: on 10/15, changing it to accumulate only df>0 words made fully-OOV questions like "今天天气怎么样" jump from 0.15 to 0.73 — the denominator collapsed to a few common characters and the 0.17 threshold stopped working. In other words, "the query contains nothing the corpus knows" is exactly the strongest signal that this question should not be answered; the ceiling must include those words |
+| **Cost** | Proper nouns and function words in long queries depress the score ("DIS-118 争议的处理结论是什么" scores below "争议处理结论"), more visibly on a small corpus |
+| **Evidence** | The property is documented in a comment directly above `self_ceiling()` in `kb_qa.py` — **it was left by a real failure**, not written as design prose; the `test_relevance.py` calibration breaks immediately if it is "fixed" again |
 
-**Evidence.** 56 + 105 assertions pin reproducibility (same input → identical score, tier and rendered text across 5 runs) and traceability (every number in the email maps to a template constant or a user-supplied fact). The red-line list takes precedence over any score; a sanctioned entity gets no outreach copy at all.
+> The production path is a cross-encoder rerank, not touching the ceiling itself. See "Known boundaries" in the README.
 
-## 4. Demo corpus with reserved connector slots, labelled honestly
+---
 
-**Decision.** The demo ingests 16 local Markdown documents under a `MarkdownIngestor` connector; source badges map to Confluence / Drive / Jira as **reserved slots**, and the API reports `demo_corpus: true` with `·demo` badges in the UI.
+## D4 · The shield is rules and validation, not a model
 
-**Alternative rejected.** Shipping unverified live connectors in the submission window. Four real OAuth integrations cannot be built and hardened in the remaining time; a half-working connector is worse than an honest slot, because a judge will discover it in five minutes.
+| | |
+|---|---|
+| **Decision** | 11 identifier classes recognised by **validation**, not length guessing (cards pass Luhn, IBANs mod-97); prompt injection detected by phrase and structure rules |
+| **Rejected** | Using an LLM (or small-model classifier) to judge "is this sensitive information / is this line an instruction" |
+| **Why** | ① The entire point of this gate is to stop content **before it reaches an LLM** — the scanner itself cannot depend on another LLM call; ② rules can be pinned in CI by **paired assertions**; a model's judgment can only be argued with by "it feels right" |
+| **Cost** | Injections rewritten to avoid the scan wordlists can bypass it; name detection covers annotated / titled names only, not street names. The remaining defences are "LLM has no write path + answer re-check + audit trail" |
+| **Evidence** | `test_shield.py`, 32 assertions including **reverse assertions**: "a 16-digit serial failing Luhn must **not** be masked", "normal business text must **not** be deleted". A test that only checks "cards are masked" would be passed by an implementation that smears every number |
 
-**Why the label is a feature.** The gates, shield and audit invariants are connector-agnostic: swapping the ingestor does not touch RBAC, the relevance gate, or the hash chain. The scope choice is stated in the README rather than discoverable — for an Aspire reviewer, a self-declared boundary reads as engineering honesty, and the `·demo` badge prevents the demo corpus from being mistaken for a live integration.
+---
 
-## 5. Shield between retrieval and the LLM; masking is need-to-know, not access control
+## D5 · Demo corpus + connector slots, not live platform integrations
 
-**Decision.** PII masking and prompt-injection line-removal (`shield.py`) run on the assembled context **after** RBAC and the relevance gate, **before** the LLM sees it. Answers are re-scanned after generation. The audit trail stores only rules and counts, never plaintext or masked values.
+| | |
+|---|---|
+| **Decision** | The corpus is 16 local Markdown files; every source-platform badge carries `·demo`; `/api/health` returns `demo_corpus: true`; connectors are slots behind a unified ingest contract + platform constant table |
+| **Rejected** | Wiring real Confluence / Jira / Drive OAuth with per-query source-of-truth checks (another project in this track did exactly that) |
+| **Why** | Concentrate limited verification effort on the **formal invariants of permissions and audit** — the things 337 assertions can re-prove in CI on every push; a connector implementation gets clicked once by a judge. Swapping in real connectors requires no change to any gate, test or invariant |
+| **Cost** | No end-to-end verification against a real platform permission model — brief requirement #2 is therefore marked "**partial**" (the filtering mechanism is implemented and measured at leak=0, but not verified against a real platform) |
+| **Evidence** | The README's "7 hard requirements → completion" table + [`requirements-map.md`](requirements-map.md); the "About the demo corpus" section states plainly that this is a **deliberate scope choice, not an unfinished feature in disguise** |
 
-**Alternative rejected.** Treating masking as an extension of RBAC (pre-retrieval), or relying on prompt-level instructions to the model.
+> Our stance on this one: better to write "partial" ourselves on the README's first screen than let a judge find it in the code. For reviewers from a licensed financial institution, stating clearly what is not done is itself part of Responsible AI.
 
-**Why ours.** Need-to-know is orthogonal to access: a user permitted to read a document still does not need every card number inside it. Luhn / mod-97 validation keeps the mask precise — a 16-digit number that fails Luhn is not masked, business text is never deleted (both are asserted by paired reverse tests, so a "mask everything" implementation cannot pass). Source prefixes are appended **after** the shield, so documents cannot forge context boundaries. The `shield_stats` audit column is deliberately excluded from the hash-chain canonical, so the migration added the column without invalidating 708 existing chained rows.
+---
+
+## D6 · The audit trail lives in a SQLite hash chain, not an external log service
+
+| | |
+|---|---|
+| **Decision** | SQLite WAL full audit + append-only triggers (blocking UPDATE/DELETE even from the owner connection) + per-row SHA-256 hash chain, re-verified in one click via `POST /api/audit/verify` |
+| **Rejected** | Managed logging / WORM storage / external SIEM (closer to a production compliance setup) |
+| **Why** | Zero external dependencies — a judge can click once, **right there**, and see "chain intact · N records all verifiable", instead of reading a statement that "we use immutable storage" |
+| **Cost** | Single machine; someone with owner login could in theory rewrite the whole chain — so verify returns the head hash, which **must be recorded outside the system** (this limitation is written in the README, not hidden) |
+| **Evidence** | `test_audit_chain.py`, 6 assertions: append-only triggers block UPDATE/DELETE + tampering is always located down to the row + legacy-db migration backfill |
+
+---
+
+## One principle running through all six
+
+**Anything deterministic code can decide, the model does not get to.** Permissions, relevance, scoring, masking, audit — all in deterministic code. The LLM appears in exactly two places (sub-question planning, answer synthesis) and **has no write path anywhere**. The cost of this principle is flexibility (the cost columns of D1 and D2 both stem from it); the payoff is that every claim can be pinned by assertions: ten suites, 337 assertions, all green, with no LLM key required.
+
+> Further reading: [`architecture.md`](architecture.md) (trust boundaries and the three gates' responsibilities) ·
+> [`RED-TEAM-REPORT.md`](RED-TEAM-REPORT.md) (26 attacks, measured) ·
+> [`requirements-map.md`](requirements-map.md) (brief clauses → mechanism → evidence)

@@ -2,6 +2,9 @@
 
 [中文版 / 中文版](README.zh-CN.md)
 
+**🔴 Live: [meridian-pay-kb.onrender.com](https://meridian-pay-kb.onrender.com)** ·
+demo account `alice` / password `meridian-demo` · **one-click judge walkthrough (six auto-steps): [`?demo=1`](https://meridian-pay-kb.onrender.com/?demo=1)**
+
 > **Ask once. Every sub-question is permission-checked. Every identifier masked. Zero leaks — measured, not promised.**
 > One question, decomposed into sub-questions; each passes RBAC and sensitive identifiers are masked before they reach the model. Zero leaks is not an architectural claim — it is a number from 26 adversarial red-team attacks.
 
@@ -91,14 +94,14 @@ Responsibilities of the three gates (all deterministic code; the LLM never parti
 
 > The demo corpus `sample_docs/` is fictional Meridian Pay (B2B fintech) data; roles, documents and audit records are for demonstration (honest simulation).
 
-## Evaluation (10 suites, 332 assertions — all green 2026-10-15)
+## Evaluation (10 suites, 337 assertions — all green 2026-10-15)
 
 | Suite | Cases | What it pins | Result | Key numbers |
 |------|------|------|------|----------|
 | test_rbac.py | 8 | Gold standard: leak rate = 0 + recall loss = 0 (paired assertions) | 8/8 ✅ | **leak rate = 0 · recall loss = 0** |
 | test_relevance.py | 21 | Irrelevant must no_context + positives must hit + score separability (0.17 calibration) | 21/21 ✅ | Irrelevant max 0.1492 < 0.17 < relevant min 0.2464 (1.14x / 1.45x margin) |
 | test_auth.py | 23 | Auth attack surface: no token / forged role / tampered payload / logout revocation / unauthorised entry | 23/23 ✅ | 23 attack-surface cases green |
-| test_web_matrix.py | 44 | 18 role-matrix pairs + audit permissions + agent workflow cases + **8 fintech role cases** + **5 data-freshness cases** + audit-chain verify permissions | 44/44 ✅ | Full matrix green |
+| test_web_matrix.py | 49 | 18 role-matrix pairs + audit permissions + agent workflow cases + **8 fintech role cases** + **5 data-freshness cases** + audit-chain verify permissions + **5 demo-mode cases** (`?demo=1` is not a bypass) | 49/49 ✅ | Full matrix green |
 | test_redteam.py | 26 | **Red team**: semantic rewrites 8 + prompt injection 4 + path escape 2 + role forgery 4 + multi-hop puzzle leaks 3 + threshold suppression 2 + anti-cheat regression 3 | 26/26 ✅ | **26 attacks, zero leaks** (report: [RED-TEAM-REPORT](docs/RED-TEAM-REPORT.md)) |
 | test_audit_chain.py | 6 | **Tamper evidence**: append-only triggers block UPDATE/DELETE + SHA-256 chain recomputation locates the tampered row + legacy-db migration backfill | 6/6 ✅ | Tampering is always located (capability ⑥ worked example) |
 | test_disclosure.py | 11 | **Customer-present disclosure gate**: zero leakage to external context + zero over-blocking of disclosable content + only narrows + sub-question level in multi-hop | 11/11 ✅ | Same question: 4 internal docs → only case-studies with customer present |
@@ -111,6 +114,8 @@ Evaluation axes aligned with industry frameworks: 0 role violations, 0 PII leaks
 Why the scorecard gets its own suite: correctness-only tests would be passed by an implementation that judges every uncertain input "do-not-pursue" — that is caution disguised as safety. Group D asserts "missing facts ≠ do-not-pursue"; group C constructs a "perfect score but red-line" input to force red-line priority.
 
 Why the email draft gets its own suite: structure-only tests would be passed by a template that sends every customer the same email with the name swapped — that is a template disguised as personalisation. Group C asserts tier / industry / strongest signal each change the output; group F asserts every number traces to a constant or a fact; group D asserts that a sanctioned entity gets **not a single word**.
+
+Why the demo mode (`?demo=1`) gets its own tests too: it is the easiest place for an auth bypass to hide — "it's for the judges" is the most legitimate-sounding reason to skip a login. D1 asserts `/` and `/?demo=1` return the **same HTML** (the server has no demo-mode branch), D3 asserts tokenless asks are still 401, and D4/D5 pin the two most critical scripted moments (sales asking the same question must be blocked; customer-present must leave only case-studies) — so what judges see live cannot drift from the script.
 
 > **Paired assertions** are a hard requirement: a test that only checks "card numbers are masked" would be passed by an implementation that masks every number; it must also check "a 16-digit number failing Luhn is not masked" and "normal business text is not deleted" to prove precision rather than brute-force obscuring.
 
@@ -159,17 +164,19 @@ Primary build tool is **WorkBuddy (Tencent Cloud)**: the 9/26 foundation run pro
 | 6 | Audit queries: tamper-evident, complete, queryable; a compliance officer can reconstruct | ✅ Full | SQLite WAL full audit + append-only triggers + SHA-256 hash chain (recomputation locates the tampered row); admin-only API + aggregate dashboard | — |
 | 7 | LLM leak mitigation: reduce hallucination and fabrication | ✅ Full | Answers grounded only in gated sources (0 hallucinated citations); no source → refusal; **answer re-check** — a card number the model invents is caught post-generation | — |
 
-**About the demo corpus (the explanation for #2's "partial")**: the corpus is 16 local Markdown files; platform badges carry `·demo` and the API returns `demo_corpus: true`. This is a **deliberate scope choice, not an unfinished feature in disguise** — verification effort is concentrated on the formal invariants of permissions and audit (provable repeatedly by 332 assertions in CI) rather than on connector implementation. Swapping in real Confluence / Jira connectors requires no change to any gate, test or invariant.
+**About the demo corpus (the explanation for #2's "partial")**: the corpus is 16 local Markdown files; platform badges carry `·demo` and the API returns `demo_corpus: true`. This is a **deliberate scope choice, not an unfinished feature in disguise** — verification effort is concentrated on the formal invariants of permissions and audit (provable repeatedly by 337 assertions in CI) rather than on connector implementation. Swapping in real Confluence / Jira connectors requires no change to any gate, test or invariant.
 
 **Beyond the official 7** (Aspire is a licensed financial institution; PII is a hard requirement the handbook does not list separately): need-to-know minimisation (masking **before** the LLM, Luhn / mod-97 validation rather than length guessing) · indirect prompt-injection defence (OWASP LLM01) · fully masked audit storage that does not become a second leak surface.
 
 - **[Requirements map](docs/requirements-map.md)** — every Aspire brief requirement → mechanism → document → visible artifact; 10 judging dimensions (10×10) → evidence mapping
-- **[Key design trade-offs](docs/DECISIONS.md)** — the submission's "key design trade-offs": 5 counter-intuitive decisions, each with the rejected alternative and why (why sub-question RBAC is not ACL-prefixed retrieval / why not embeddings / why the model does not grade / why the demo corpus is deliberate scope / why the shield sits after retrieval, before the LLM)
+- **[Key design trade-offs](docs/DECISIONS.md)** — six decisions, each stating what was chosen / what was rejected / **the cost** / which tests pin it (including the measured counter-example for why OOV words must count toward the BM25 ceiling)
 - Submission items: WorkBuddy proof (sessions ①–⑤ + 12 screenshots, [AI-COLLABORATION.md](docs/AI-COLLABORATION.md)) ✅ · 8-word blurb (repo-wide: `Ask anything. RBAC decides. Shield masks. You audit.`) ✅ · 16:9 cover 380×216 ✅
 
 ### 30-second experience path (live demo)
 
 > Live: **https://meridian-pay-kb.onrender.com** (measured sub-second response after 16 minutes idle; local: `http://localhost:8000`)
+>
+> **In a hurry, just open [`?demo=1`](https://meridian-pay-kb.onrender.com/?demo=1)**: a demo bar appears at the top; clicking "next" switches accounts, switches workflows and asks the questions itself — six steps covering RBAC interception, account intelligence and the customer-present disclosure gate. It only pre-fills the password and guides in order; **every step goes through the real `/api/login` + `/api/ask`**, so the `no_context` sales sees in that step is genuinely blocked server-side, not staged in the frontend (`test_web_matrix.py` D1–D5 pin this).
 
 | Step | Action | What you see |
 |---|---|---|
@@ -234,14 +241,14 @@ static/index.html   chat UI (login / workflow selector / planning block / platfo
 test_rbac.py        gold standard (leak=0 + recall loss=0)
 test_relevance.py   relevance-gate calibration (21 cases)
 test_auth.py        auth attack surface (23 cases, self-hosted service)
-test_web_matrix.py  web-layer matrix (44 cases: 8 fintech roles + 5 data-freshness + audit-chain verify permissions)
+test_web_matrix.py  web-layer matrix (49 cases: 8 fintech roles + 5 data-freshness + 5 demo-mode + audit-chain verify permissions)
 test_audit_chain.py audit hash chain (append-only triggers + chain recomputation locates tampering)
 test_disclosure.py  customer-present disclosure gate (audience tiers: zero leak + zero over-blocking)
 test_shield.py      shield suite (masking + injection scan + answer re-check, 32 assertions, incl. reverse assertions)
 test_gtm_scorecard.py  scorecard suite (reproducibility + rule correctness + red-line priority + missing-fact handling, 56 assertions)
 test_redteam.py     red-team suite (26 attack checks, zero leaks; start the service with KB_LOGIN_RATE_LIMIT=200 before running)
 docs/requirements-map.md  requirements map (Aspire brief → mechanism → evidence + judging dimensions)
-docs/DECISIONS.md   key design trade-offs (5 counter-intuitive decisions + rejected alternatives)
+docs/DECISIONS.md   key design trade-offs (six decisions, each with the cost it accepts)
 docs/architecture.md  architecture & trust boundaries (mermaid pipeline + three-zone responsibility table)
 docs/RED-TEAM-REPORT.md  red-team report (attack matrix + the "why" of each group)
 docs/UX-ACCESSIBILITY-AUDIT.md  accessibility audit (WCAG 2.2 AA contrast measurements + applied fixes)
@@ -249,7 +256,7 @@ docs/AI-COLLABORATION.md  AI collaboration narrative (WorkBuddy primary builder 
 docs/build-sessions/  WorkBuddy sessions ①–⑤ full prompts + 9/26 foundation-run transcript
 scripts/demo_path.py  demo path e2e proof (three roles: hit/block/audit/401/403)
 scripts/demo_shield.py  shield contrast demo (off/on + answer re-check, 8 self-checks)
-.github/workflows/  CI: ten suites, 332 assertions on every push (no LLM key needed)
+.github/workflows/  CI: ten suites, 337 assertions on every push (no LLM key needed)
 证据/               WorkBuddy chat screenshots ×12 + local demo screenshots ×9 + cover image
 sample_docs/        Meridian Pay corpus ×16 (public/internal/gtm/compliance/risk/card_ops/finance; gtm includes LAARC objection playbook + signal library; fictional data)
 demo_docs/          shield demo corpus (dispute record with PII and injection), separate directory, excluded from calibration
