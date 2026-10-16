@@ -1,5 +1,7 @@
 # Meridian Pay Knowledge Brain (KB-QA Agent Platform)
 
+<img src="docs/cover.png" width="380" alt="Meridian Pay — Enterprise Knowledge Brain · Ask anything. RBAC decides. Shield masks. You audit.">
+
 [中文版 / 中文版](README.zh-CN.md)
 
 **🔴 Live: [meridian-pay-kb.onrender.com](https://meridian-pay-kb.onrender.com)** ·
@@ -24,6 +26,10 @@ Tencent Cloud AI CAN DO IT Hackathon 2026 · FinTech Track (challenge by Aspire)
 ![Multi-hop agent query planning](docs/demo-agent.png)
 
 ![Account intelligence briefing](docs/demo-brief.png)
+
+**The core shot — same question, two roles:** `alice` (admin) gets the cited answer (left); `sam` (sales) gets a clean `no_context` refusal for the very same question (right). Not an empty page, not an error — a designed card.
+
+![Admin: cited answer](docs/demo-hit.png) ![Sales: clean no_context refusal](docs/demo-blocked.png)
 
 ## What it is
 
