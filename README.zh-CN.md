@@ -15,6 +15,8 @@
 腾讯云 AI CAN DO IT Hackathon 2026 · FinTech 赛道（Aspire 出题）
 **FinTech 赛道（Aspire）— 赛题："The Internal Brain: A Context-Aware Enterprise Knowledge System with RBAC, Security Logging & Audit Trail"**
 
+**Built solo** — 一人开发，一个 AI 助手，没有队友。337 条断言，十套测试，一个连贯的代码库。
+
 ## 界面
 
 ![多跳 agent 查询规划](docs/demo-agent.png)

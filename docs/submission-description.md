@@ -22,7 +22,8 @@ answer** — no OAuth allowlists, no setup steps. Three layers protect every ans
 sub-question-level RBAC, an audience disclosure gate for customer-present
 conversations, and a need-to-know shield that masks identifiers *before* retrieved text
 reaches the model. Every number in this submission is reproduced by CI on every push
-(ten suites, 337 assertions, all green).
+(ten suites, 337 assertions, all green). **Built solo** — one developer, one AI
+assistant, no teammates: 337 assertions, ten suites, one coherent codebase.
 
 ## Real-world insights
 

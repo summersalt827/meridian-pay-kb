@@ -15,6 +15,8 @@ demo account `alice` / password `meridian-demo` · **one-click judge walkthrough
 Tencent Cloud AI CAN DO IT Hackathon 2026 · FinTech Track (challenge by Aspire)
 **FinTech Track (Aspire) — challenge: "The Internal Brain: A Context-Aware Enterprise Knowledge System with RBAC, Security Logging & Audit Trail"**
 
+**Built solo** — one developer, one AI assistant, no teammates. 337 assertions, ten suites, one coherent codebase.
+
 ## Interface
 
 ![Multi-hop agent query planning](docs/demo-agent.png)
