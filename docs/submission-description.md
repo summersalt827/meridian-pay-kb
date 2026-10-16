@@ -3,6 +3,8 @@
 > **Title**: Meridian Pay — Enterprise Knowledge Brain
 > **Blurb** (≤10 words, 8 words): *Ask anything. RBAC decides. Shield masks. You audit.*
 > (与 README、requirements-map 三处一致，勿再出现第二版本)
+> **Demo video (5:57)**: https://youtu.be/b3Z1RCmMRmI (unlisted)
+> **Live**: https://meridian-pay-kb.onrender.com · **GitHub**: https://github.com/summersalt827/meridian-pay-kb
 > Paste the four paragraphs below into the Project Description field.
 
 ---
