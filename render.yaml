@@ -19,3 +19,5 @@ services:
         sync: false
       - key: KB_RESYNC_MINUTES
         value: "60"
+      - key: KB_LOGIN_RATE_LIMIT
+        value: "120"

@@ -13,7 +13,7 @@ demo account `alice` / password `meridian-demo` · **one-click judge walkthrough
 ![tests](https://github.com/summersalt827/meridian-pay-kb/actions/workflows/tests.yml/badge.svg)
 
 Tencent Cloud AI CAN DO IT Hackathon 2026 · FinTech Track (challenge by Aspire)
-**Enterprise Agent Builder & Autonomous Operations Platform** — demo scenario ② Internal Knowledge Brain
+**FinTech Track (Aspire) — challenge: "The Internal Brain: A Context-Aware Enterprise Knowledge System with RBAC, Security Logging & Audit Trail"**
 
 ## Interface
 

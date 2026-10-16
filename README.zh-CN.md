@@ -13,7 +13,7 @@
 ![tests](https://github.com/summersalt827/meridian-pay-kb/actions/workflows/tests.yml/badge.svg)
 
 腾讯云 AI CAN DO IT Hackathon 2026 · FinTech 赛道（Aspire 出题）
-**Enterprise Agent Builder & Autonomous Operations Platform** — 演示场景 ② Internal Knowledge Brain
+**FinTech 赛道（Aspire）— 赛题："The Internal Brain: A Context-Aware Enterprise Knowledge System with RBAC, Security Logging & Audit Trail"**
 
 ## 界面
 
