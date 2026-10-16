@@ -7,6 +7,8 @@ demo account `alice` / password `meridian-demo` · **one-click judge walkthrough
 
 **📹 Demo video (5:57): [https://youtu.be/b3Z1RCmMRmI](https://youtu.be/b3Z1RCmMRmI)** — FinTech case-study declaration, sub-question RBAC, disclosure gate, shield, audit chain, evaluation
 
+**Judges in a hurry**: [7 brief requirements → completion](#the-briefs-7-hard-requirements--completion-handbook-2) · [30-second experience path](#30-second-experience-path-live-demo) · [known boundaries](#known-boundaries-honest)
+
 > **Ask once. Every sub-question is permission-checked. Every identifier masked. Zero leaks — measured, not promised.**
 > One question, decomposed into sub-questions; each passes RBAC and sensitive identifiers are masked before they reach the model. Zero leaks is not an architectural claim — it is a number from 26 adversarial red-team attacks.
 
@@ -168,7 +170,7 @@ Primary build tool is **WorkBuddy (Tencent Cloud)**: the 9/26 foundation run pro
 | 6 | Audit queries: tamper-evident, complete, queryable; a compliance officer can reconstruct | ✅ Full | SQLite WAL full audit + append-only triggers + SHA-256 hash chain (recomputation locates the tampered row); admin-only API + aggregate dashboard | — |
 | 7 | LLM leak mitigation: reduce hallucination and fabrication | ✅ Full | Answers grounded only in gated sources (0 hallucinated citations); no source → refusal; **answer re-check** — a card number the model invents is caught post-generation | — |
 
-**About the demo corpus (the explanation for #2's "partial")**: the corpus is 16 local Markdown files; platform badges carry `·demo` and the API returns `demo_corpus: true`. This is a **deliberate scope choice, not an unfinished feature in disguise** — verification effort is concentrated on the formal invariants of permissions and audit (provable repeatedly by 337 assertions in CI) rather than on connector implementation. Swapping in real Confluence / Jira connectors requires no change to any gate, test or invariant.
+**About the demo corpus (the explanation for #2's "partial")**: the corpus is 16 local Markdown files; platform badges carry `·demo` and the API returns `demo_corpus: true`. This is a **deliberate scope choice, not an unfinished feature in disguise** — verification effort is concentrated on the formal invariants of permissions and audit (provable repeatedly by 337 assertions in CI) rather than on connector implementation. **The cost to complete it is bounded and cheap**: swapping in real Confluence / Jira connectors means one 100-line adapter class (the existing `MarkdownIngestor` is exactly that, `kb_qa.py:385`) — **zero changes to any gate, test or invariant**.
 
 **Beyond the official 7** (Aspire is a licensed financial institution; PII is a hard requirement the handbook does not list separately): need-to-know minimisation (masking **before** the LLM, Luhn / mod-97 validation rather than length guessing) · indirect prompt-injection defence (OWASP LLM01) · fully masked audit storage that does not become a second leak surface.
 

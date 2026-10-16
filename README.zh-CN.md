@@ -7,6 +7,8 @@
 
 **📹 演示视频（5:57）：[https://youtu.be/b3Z1RCmMRmI](https://youtu.be/b3Z1RCmMRmI)** — 命题声明、子问题级 RBAC、披露门、盾牌、审计链、评测
 
+**赶时间的评委**：[赛题 7 项要求 → 完成度](#赛题-7-项硬性要求--完成度手册-2) · [30 秒体验路径](#30-秒体验路径live-demo) · [诚实边界](#已知边界honest-boundary)
+
 > **Ask once. Every sub-question is permission-checked. Every identifier masked. Zero leaks — measured, not promised.**
 > 一次提问，多跳拆解；每个子问题都过权限、敏感标识进模型前逐条脱敏；零泄露不是架构声明，是 26 项红队攻击实测的数字。
 
@@ -205,7 +207,7 @@ Claude Code 负责补丁合并、评测质量门与 UI 打磨——完整分工�
 **关于演示语料（第 2 项「部分」的说明）**：语料是 16 篇本地 Markdown，平台徽章一律带 `·demo`
 标记，API 返回 `demo_corpus: true`。这是**刻意的范围选择，不是未完成的掩饰**——把验证资源集中
 在权限与审计的形式化不变量上（这些可以在 CI 里被 337 条断言反复证明），而非连接器实现上。
-换成真实 Confluence / Jira 连接器时，每一道闸门、每一套测试、每一条不变量都不需要改动。
+**补齐它的代价是有限且便宜的**：换成真实 Confluence / Jira 连接器 = 一个 100 行的适配器类（现有的 `MarkdownIngestor` 就是它，`kb_qa.py:385`）——**每一道闸门、每一套测试、每一条不变量零改动**。
 
 **超出官方 7 项的补充**（Aspire 是持牌金融机构，PII 是硬要求，手册未单列）：
 need-to-know 最小知情（进 LLM **之前**掩码多类标识，靠 Luhn / mod-97 校验而非长度猜测）·
