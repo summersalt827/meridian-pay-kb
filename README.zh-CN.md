@@ -5,6 +5,8 @@
 **🔴 线上可点开：[meridian-pay-kb.onrender.com](https://meridian-pay-kb.onrender.com)** ·
 演示账号 `alice` / 口令 `meridian-demo` · **评委一键演示（六步自动走完）：[`?demo=1`](https://meridian-pay-kb.onrender.com/?demo=1)**
 
+**📹 演示视频（5:57）：[https://youtu.be/b3Z1RCmMRmI](https://youtu.be/b3Z1RCmMRmI)** — 命题声明、子问题级 RBAC、披露门、盾牌、审计链、评测
+
 > **Ask once. Every sub-question is permission-checked. Every identifier masked. Zero leaks — measured, not promised.**
 > 一次提问，多跳拆解；每个子问题都过权限、敏感标识进模型前逐条脱敏；零泄露不是架构声明，是 26 项红队攻击实测的数字。
 

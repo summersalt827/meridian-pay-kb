@@ -94,4 +94,4 @@ We demonstrate **two**:
 | Cover 16:9 380×216 | ✅ `证据/封面图_16-9_380x216.png` |
 | Project link (bonus) | ✅ Live at https://meridian-pay-kb.onrender.com (deployed 2026-10-15; health + login + RBAC verified live) |
 | Mocked integrations labelled | ✅ 平台徽章一律带 `·demo` 后缀，`/api/health` 返回 `demo_corpus: true`，README 单列「已知边界」——不把演示语料包装成实时连接器 |
-| Demo video 5–8 min (optional) | Script drafted (8 beats); recording planned 10/15 |
+| Demo video 5–8 min (optional) | ✅ 5:57 — https://youtu.be/b3Z1RCmMRmI (unlisted): case-study declaration → sub-question RBAC → GTM scorecard → disclosure gate → audit chain → shield → 337 assertions; English narration + burned-in subtitles |

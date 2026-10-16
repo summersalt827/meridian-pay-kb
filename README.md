@@ -5,6 +5,8 @@
 **🔴 Live: [meridian-pay-kb.onrender.com](https://meridian-pay-kb.onrender.com)** ·
 demo account `alice` / password `meridian-demo` · **one-click judge walkthrough (six auto-steps): [`?demo=1`](https://meridian-pay-kb.onrender.com/?demo=1)**
 
+**📹 Demo video (5:57): [https://youtu.be/b3Z1RCmMRmI](https://youtu.be/b3Z1RCmMRmI)** — FinTech case-study declaration, sub-question RBAC, disclosure gate, shield, audit chain, evaluation
+
 > **Ask once. Every sub-question is permission-checked. Every identifier masked. Zero leaks — measured, not promised.**
 > One question, decomposed into sub-questions; each passes RBAC and sensitive identifiers are masked before they reach the model. Zero leaks is not an architectural claim — it is a number from 26 adversarial red-team attacks.
 
@@ -171,7 +173,7 @@ Primary build tool is **WorkBuddy (Tencent Cloud)**: the 9/26 foundation run pro
 - **[Requirements map](docs/requirements-map.md)** — every Aspire brief requirement → mechanism → document → visible artifact; 10 judging dimensions (10×10) → evidence mapping
 - **[Key design trade-offs](docs/DECISIONS.md)** — six decisions, each stating what was chosen / what was rejected / **the cost** / which tests pin it (including the measured counter-example for why OOV words must count toward the BM25 ceiling)
 - **[Self-verification checklist](docs/SELF-VERIFICATION.md)** — three-minute browser version + ten-minute CLI version; `python3 scripts/verify.py` re-proves 37 claims (every public statement in the README), `--full` additionally runs all ten suites (337 assertions)
-- Submission items: WorkBuddy proof (sessions ①–⑤ + 12 screenshots, [AI-COLLABORATION.md](docs/AI-COLLABORATION.md)) ✅ · 8-word blurb (repo-wide: `Ask anything. RBAC decides. Shield masks. You audit.`) ✅ · 16:9 cover 380×216 ✅
+- Submission items: WorkBuddy proof (sessions ①–⑤ + 12 screenshots, [AI-COLLABORATION.md](docs/AI-COLLABORATION.md)) ✅ · 8-word blurb (repo-wide: `Ask anything. RBAC decides. Shield masks. You audit.`) ✅ · 16:9 cover 380×216 ✅ · demo video (5:57, English narration + subtitles): [https://youtu.be/b3Z1RCmMRmI](https://youtu.be/b3Z1RCmMRmI) ✅
 
 ### 30-second experience path (live demo)
 
