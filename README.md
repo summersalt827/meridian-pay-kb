@@ -42,7 +42,7 @@ A parameterised agent-workflow platform: one multi-hop skeleton — *plan → re
 **Permissions & security**
 
 - Authentication (`auth.py`, stdlib only): PBKDF2-HMAC-SHA256 password hashing (200k iterations + random salt), HMAC-signed session tokens (jti logout revocation, role change invalidates, constant-time compare), dummy-hash for unknown users to prevent account enumeration
-- RBAC: directory-level permissions, **7 roles × 7 directories** — admin: all; sales: public+gtm; viewer: public; compliance_officer: public+compliance; risk_analyst: public+compliance+risk; card_ops: public+card_ops; finance_analyst: public+finance. **Enforced at the sub-question level** — an out-of-scope sub-question retrieves nothing; roles come only from server-issued tokens, never from the request body
+- RBAC: directory-level permissions, **7 roles × 7 directories** — admin: all; sales: public+gtm; viewer: public; compliance_officer: public+compliance; risk_analyst: public+compliance+risk; card_ops: public+card_ops; finance_analyst: public+finance. **Enforced at the sub-question level** — as a permission gate, not an answer layout: an out-of-scope sub-question retrieves nothing; roles come only from server-issued tokens, never from the request body
 - Governance: `/api/audit` and `/api/ask` trust only the Bearer token (401 without, 403 with insufficient role)
 
 **Shield (third gate · `shield.py`)**

@@ -53,7 +53,7 @@
 - RBAC：目录级权限，**7 个岗位 × 7 个目录**——admin 全部；sales = public+gtm；
   viewer = public；compliance_officer = public+compliance；risk_analyst = public+compliance+risk；
   card_ops = public+card_ops；finance_analyst = public+finance
-  **子问题层级生效**——越权子问题检索为空；角色只由服务端令牌签发，请求体声明无效
+  **子问题层级生效**——是权限闸门，不是答案排版：越权子问题检索为空；角色只由服务端令牌签发，请求体声明无效
 - 治理：/api/audit 与 /api/ask 身份只认 Bearer 令牌（无令牌 401 / 角色不足 403）
 
 **盾牌（第三道闸 · `shield.py`）**
