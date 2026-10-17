@@ -6,6 +6,7 @@
 
 **🔴 Live: [meridian-pay-kb.onrender.com](https://meridian-pay-kb.onrender.com)** ·
 demo account `alice` / password `meridian-demo` · **one-click judge walkthrough (six auto-steps): [`?demo=1`](https://meridian-pay-kb.onrender.com/?demo=1)**
+The live instance runs **read-only** (`KB_LIVE_READONLY=1`): since demo credentials are public, the only admin write endpoint (`/api/resync`) is disabled there — login, Q&A, audit and the `?demo=1` walkthrough are unaffected; local deployments keep full functionality.
 
 **📹 Demo video (5:57): [https://youtu.be/b3Z1RCmMRmI](https://youtu.be/b3Z1RCmMRmI)** — FinTech case-study declaration, sub-question RBAC, disclosure gate, shield, audit chain, evaluation
 

@@ -21,3 +21,5 @@ services:
         value: "60"
       - key: KB_LOGIN_RATE_LIMIT
         value: "120"
+      - key: KB_LIVE_READONLY
+        value: "1"

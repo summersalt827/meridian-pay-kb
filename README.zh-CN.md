@@ -4,6 +4,7 @@
 
 **🔴 线上可点开：[meridian-pay-kb.onrender.com](https://meridian-pay-kb.onrender.com)** ·
 演示账号 `alice` / 口令 `meridian-demo` · **评委一键演示（六步自动走完）：[`?demo=1`](https://meridian-pay-kb.onrender.com/?demo=1)**
+线上实例为**只读演示模式**（`KB_LIVE_READONLY=1`）：演示口令是公开的，所以 admin 唯一写端点 `/api/resync` 在线上被禁用——登录、问答、审计与 `?demo=1` 演示流程不受影响；本地部署保留全部功能。
 
 **📹 演示视频（5:57）：[https://youtu.be/b3Z1RCmMRmI](https://youtu.be/b3Z1RCmMRmI)** — 命题声明、子问题级 RBAC、披露门、盾牌、审计链、评测
 

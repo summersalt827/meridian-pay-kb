@@ -125,6 +125,9 @@ class WebConfig:
     login_rate_limit_per_min: int = 10
     # 数据新鲜度: >0 时后台每 N 分钟自动重扫语料 (有界窗口), 0 = 仅手动 /api/resync
     resync_minutes: int = 0
+    # 只读演示模式 (公开 live URL 用): 演示账号口令公开, 禁掉 admin 唯一写端点 /api/resync;
+    # 后台定时重扫与问答/审计只读端点不受影响, ?demo=1 演示流程完整保留
+    live_readonly: bool = False
 
     @classmethod
     def from_env(cls) -> "WebConfig":
@@ -145,6 +148,7 @@ class WebConfig:
             rate_limit_per_min=int(os.getenv("KB_RATE_LIMIT", "60")),
             login_rate_limit_per_min=int(os.getenv("KB_LOGIN_RATE_LIMIT", "10")),
             resync_minutes=int(os.getenv("KB_RESYNC_MINUTES", "0")),
+            live_readonly=_env_bool("KB_LIVE_READONLY", False),
         )
 
     def to_kb_config(self) -> Config:
@@ -410,6 +414,9 @@ class KBHandler(BaseHTTPRequestHandler):
             if acct.role != "admin":
                 self._send_error_json(403, "重扫仅 admin 可用")
                 return
+        if self.web_cfg.live_readonly:
+            self._send_error_json(403, "线上演示实例为只读模式, 手动重扫已禁用 (本地部署可全功能)")
+            return
         self.kb.rescan()
         docs = sorted({c.path for c in self.kb.chunks})
         self._send_json(200, {
