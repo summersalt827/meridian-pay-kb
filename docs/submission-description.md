@@ -1,4 +1,4 @@
-# Submission copy (form-ready, Handbook §8 four-part structure)
+# Submission copy (form-ready, Handbook §7 four-part structure)
 
 > **Title**: Meridian Pay — Enterprise Knowledge Brain
 > **Blurb** (≤10 words, 8 words): *Ask anything. RBAC decides. Shield masks. You audit.*

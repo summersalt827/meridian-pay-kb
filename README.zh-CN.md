@@ -8,10 +8,10 @@
 
 **📹 演示视频（5:57）：[https://youtu.be/b3Z1RCmMRmI](https://youtu.be/b3Z1RCmMRmI)** — 命题声明、子问题级 RBAC、披露门、盾牌、审计链、评测
 
-**赶时间的评委**：[赛题 7 项要求 → 完成度](#赛题-7-项硬性要求--完成度手册-2) · [30 秒体验路径](#30-秒体验路径live-demo) · [诚实边界](#已知边界honest-boundary)
+**赶时间的评委**：[赛题 7 项要求 → 完成度](#赛题-7-项硬性要求--完成度-手册-5-fintech-赛道) · [30 秒体验路径](#30-秒体验路径live-demo) · [三道闸门](#架构与信任边界) · [诚实边界](#已知边界honest-boundary)
 
 > **Ask once. Every sub-question is permission-checked. Every identifier masked. Zero leaks — measured, not promised.**
-> 一次提问，多跳拆解；每个子问题都过权限、敏感标识进模型前逐条脱敏；零泄露不是架构声明，是 26 项红队攻击实测的数字。
+> 一次提问，多跳拆解；每个子问题都过权限、客户在场时披露门决定什么能对客户说、敏感标识进模型前逐条脱敏；零泄露不是架构声明，是 26 项红队攻击实测的数字。
 
 ![tests](https://github.com/summersalt827/meridian-pay-kb/actions/workflows/tests.yml/badge.svg)
 
@@ -190,7 +190,7 @@ Claude Code 负责补丁合并、评测质量门与 UI 打磨——完整分工�
 
 ## 评审速览（For judges）
 
-### 赛题 7 项硬性要求 → 完成度（手册 §2）
+### 赛题 7 项硬性要求 → 完成度（手册 §5，FinTech 赛道）
 
 > 逐条对照 Aspire 出题原文。**7 项中 5 项完整实现、2 项部分实现**——边界主动标出来，
 > 因为对持牌金融机构的评审而言，说清自己没做到什么，本身就是 Responsible AI 的一部分。
@@ -225,7 +225,7 @@ need-to-know 最小知情（进 LLM **之前**掩码多类标识，靠 Luhn / mo
 
 ### 30 秒体验路径（live demo）
 
-> 线上地址：**https://meridian-pay-kb.onrender.com**（实测空闲 16 分钟后仍秒回；本地体验用 `http://localhost:8000`）
+> 线上地址：**https://meridian-pay-kb.onrender.com**（13 分钟保活 ping 保持热机，热响应实测 0.37s，2026-10-17；本地体验用 `http://localhost:8000`）
 >
 > **赶时间就直接开 [`?demo=1`](https://meridian-pay-kb.onrender.com/?demo=1)**：顶部出现演示条，
 > 点「下一步」它会自己换账号、切工作流、提问——六步走完 RBAC 拦截、账户情报、客户在场披露门。
@@ -285,7 +285,7 @@ KB_AUTH_SECRET=$(openssl rand -hex 24) python3 web_ui.py
 
 `render.yaml` Blueprint 一键部署。Dashboard 补两个环境变量：`LLM_API_KEY`、`KB_AUTH_SECRET`
 （均为 sync: false，不入仓库）。已部署于 **https://meridian-pay-kb.onrender.com**
-（实测空闲 16 分钟后仍秒回，无需预热保活）。
+（13 分钟保活 ping 保持热机，热响应实测 0.37s；不保活则 free 档空闲 15 分钟后休眠、首个请求约 21s 唤醒——均为 2026-10-17 实测）。
 
 演示账号只属于演示实例：线上实例以 `KB_LIVE_READONLY=1` 运行（admin 唯一写端点已禁用），正式部署设 `KB_DEMO_ACCOUNTS=0` 可整体禁用内置演示账号（登录一律 401，health 不再报告演示账号）。
 
