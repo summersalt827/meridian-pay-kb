@@ -287,6 +287,8 @@ KB_AUTH_SECRET=$(openssl rand -hex 24) python3 web_ui.py
 （均为 sync: false，不入仓库）。已部署于 **https://meridian-pay-kb.onrender.com**
 （实测空闲 16 分钟后仍秒回，无需预热保活）。
 
+演示账号只属于演示实例：线上实例以 `KB_LIVE_READONLY=1` 运行（admin 唯一写端点已禁用），正式部署设 `KB_DEMO_ACCOUNTS=0` 可整体禁用内置演示账号（登录一律 401，health 不再报告演示账号）。
+
 ## 目录
 
 ```

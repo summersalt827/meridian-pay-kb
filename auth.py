@@ -53,6 +53,11 @@ DEMO_ACCOUNTS: tuple[tuple[str, str, str], ...] = (
 
 DEFAULT_DEMO_PASSWORD = "meridian-demo"        # 演示口令; 用 KB_DEMO_PASSWORD 覆盖
 
+# 生产模式开关: KB_DEMO_ACCOUNTS=0 时演示账号整体禁用 (登录一律 401)。
+# 公开 live 实例 = 演示账号 + KB_LIVE_READONLY 只读双保险; 正式部署设 0。
+if (os.getenv("KB_DEMO_ACCOUNTS", "1") or "1").strip().lower() in ("0", "false", "no"):
+    DEMO_ACCOUNTS = ()
+
 
 # ---- base64url 辅助 ----
 

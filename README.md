@@ -243,6 +243,8 @@ KB_AUTH_SECRET=$(openssl rand -hex 24) python3 web_ui.py
 
 `render.yaml` Blueprint, one-click. Fill two environment variables in the dashboard: `LLM_API_KEY`, `KB_AUTH_SECRET` (both `sync: false`, never in the repo). Deployed at **https://meridian-pay-kb.onrender.com** (measured sub-second response after 16 minutes idle on the free tier — no warm-up needed).
 
+Demo accounts are for the demo instance only: the live instance runs with `KB_LIVE_READONLY=1` (the only admin write endpoint is disabled there), and a production deployment sets `KB_DEMO_ACCOUNTS=0` to disable the built-in demo accounts entirely (login returns 401; the health endpoint then reports no demo accounts).
+
 ## Layout
 
 ```
