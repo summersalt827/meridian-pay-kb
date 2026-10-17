@@ -1,0 +1,16 @@
+name: keepalive
+
+on:
+  schedule:
+    - cron: "*/13 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping live instance (keeps Render free tier warm)
+        run: curl -fsS --max-time 30 https://meridian-pay-kb.onrender.com/api/health
