@@ -1429,9 +1429,14 @@ class KnowledgeBase:
         self._built = False
         self.last_ingest_ts: str | None = None
 
-    def build(self) -> None:
-        """摄入文档并构建索引。"""
-        ingestor = MarkdownIngestor(self.cfg.kb_root, self.cfg.chunk_size, self.cfg.chunk_overlap)
+    def build(self, ingestor=None) -> None:
+        """摄入文档并构建索引。
+
+        ingestor: 统一摄入契约的插槽 (任何带 .ingest() -> list[Chunk] 的对象)。
+        默认用本地 MarkdownIngestor; 换数据源 = 换这个参数, 门/测试/不变量零改动。
+        """
+        if ingestor is None:
+            ingestor = MarkdownIngestor(self.cfg.kb_root, self.cfg.chunk_size, self.cfg.chunk_overlap)
         self.chunks = ingestor.ingest()
         token_lists = [tokenize(c.content) for c in self.chunks]
         # 向量后端选择

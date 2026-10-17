@@ -1,0 +1,81 @@
+{
+  "source": "confluence-rest-v2-fixture",
+  "note": "Shape mirrors Confluence Cloud REST v2 single-page responses (id/status/version/body.storage.value). Fictional Meridian Pay demo content; the adapter maps spaceKey -> knowledge-base directory via SPACE_DIRS.",
+  "results": [
+    {
+      "id": "33001",
+      "type": "page",
+      "status": "current",
+      "title": "Meridian Pay FAQ",
+      "spaceId": "73728",
+      "spaceKey": "MDP",
+      "version": {"number": 4, "createdAt": "2026-10-14T09:12:00.000Z"},
+      "body": {
+        "storage": {
+          "representation": "storage",
+          "value": "<h1>Meridian Pay FAQ</h1><h2>Refunds</h2><p>Cardholders can request a refund within <strong>14 days</strong> of the original transaction. Refunds are returned to the original funding method and settle in 3 to 5 business days.</p><h2>Password reset</h2><p>Use the self-service reset link on the sign-in screen. A reset email arrives within two minutes; check the spam folder if it does not appear.</p><h2>Fee schedule</h2><ul><li>Domestic transfer fee: 0.4%</li><li>Cross-border transaction fee: 1.5%</li><li>Wallet top-up is free from linked bank accounts</li></ul>"
+        }
+      }
+    },
+    {
+      "id": "33002",
+      "type": "page",
+      "status": "current",
+      "title": "Getting Started",
+      "spaceId": "73728",
+      "spaceKey": "MDP",
+      "version": {"number": 2, "createdAt": "2026-10-11T03:40:00.000Z"},
+      "body": {
+        "storage": {
+          "representation": "storage",
+          "value": "<h1>Getting Started</h1><h2>Onboarding</h2><p>New users activate their card in the mobile app with the activation code printed on the welcome letter.</p><h2>Wallet top-up</h2><p>Link a bank account, then top up instantly. Top-ups from linked accounts are free.</p><h2>Support</h2><p>The in-app help centre covers account settings, statements and card replacement.</p>"
+        }
+      }
+    },
+    {
+      "id": "33003",
+      "type": "page",
+      "status": "current",
+      "title": "Objection Playbook",
+      "spaceId": "73729",
+      "spaceKey": "MDP-GTM",
+      "version": {"number": 6, "createdAt": "2026-10-15T07:05:00.000Z"},
+      "body": {
+        "storage": {
+          "representation": "storage",
+          "value": "<h1>Objection Playbook</h1><h2>Pricing objection</h2><p>When a prospect pushes back on pricing, anchor on the annual discount and the ROI from time saved. Offer the pilot tier before any discount conversation.</p><h2>Security objection</h2><p>Lead with encryption at rest, quarterly penetration tests and MAS licensing. Do not promise features not yet shipped.</p><h2>Timing objection</h2><p>Map the prospect's budget cycle; propose a short pilot that fits the next quarter.</p>"
+        }
+      }
+    },
+    {
+      "id": "33004",
+      "type": "page",
+      "status": "current",
+      "title": "Case Study: Finstack",
+      "spaceId": "73729",
+      "spaceKey": "MDP-GTM",
+      "version": {"number": 3, "createdAt": "2026-10-13T11:20:00.000Z"},
+      "body": {
+        "storage": {
+          "representation": "storage",
+          "value": "<h1>Case Study: Finstack</h1><h2>Deal profile</h2><p>Finstack, a 40-person fintech startup, signed a 300-seat deal at S$120k annual value. Sales cycle was 9 weeks from first call to signature.</p><h2>Winning moves</h2><ul><li>Two-week pilot with the CFO's team</li><li>ROI narrative built on 6 hours saved per rep per week</li><li>Expansion revenue of 30% in the second year</li></ul>"
+        }
+      }
+    },
+    {
+      "id": "33005",
+      "type": "page",
+      "status": "current",
+      "title": "KYC Verification Policy",
+      "spaceId": "73730",
+      "spaceKey": "MDP-COMP",
+      "version": {"number": 5, "createdAt": "2026-10-12T02:15:00.000Z"},
+      "body": {
+        "storage": {
+          "representation": "storage",
+          "value": "<h1>KYC Verification Policy</h1><h2>Customer due diligence</h2><p>Identity verification requires NRIC or passport, proof of address, and source of funds. Basic due diligence must complete before first transaction.</p><h2>Enhanced due diligence</h2><p>Politically exposed persons and high-risk jurisdictions trigger enhanced due diligence with senior approval.</p><h2>Suspicious transaction reporting</h2><p>File a suspicious transaction report within one business day. Do not tip off the customer.</p>"
+        }
+      }
+    }
+  ]
+}

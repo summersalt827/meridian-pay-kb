@@ -208,7 +208,7 @@ Claude Code 负责补丁合并、评测质量门与 UI 打磨——完整分工�
 **关于演示语料（第 2 项「部分」的说明）**：语料是 16 篇本地 Markdown，平台徽章一律带 `·demo`
 标记，API 返回 `demo_corpus: true`。这是**刻意的范围选择，不是未完成的掩饰**——把验证资源集中
 在权限与审计的形式化不变量上（这些可以在 CI 里被 337 条断言反复证明），而非连接器实现上。
-**补齐它的代价是有限且便宜的**：换成真实 Confluence / Jira 连接器 = 一个 100 行的适配器类（现有的 `MarkdownIngestor` 就是它，`kb_qa.py:385`）——**每一道闸门、每一套测试、每一条不变量零改动**。
+**补齐它的代价是有限且便宜的**：换成真实 Confluence / Jira 连接器 = 一个 100 行的适配器类（现有的 `MarkdownIngestor` 就是它，`kb_qa.py:385`）——**每一道闸门、每一套测试、每一条不变量零改动**。这个插槽本身是真实存在的：`kb.build(ingestor=...)` 接受任何 `ingest()` 实现，仓库里的 `ingest_adapters.py` 已带一个 ~100 行 Confluence REST v2 适配器（fixture 支撑、storage 格式子集），换入即可，**门/测试/不变量零改动**——现场复跑见 `python3 scripts/demo_ingestor_swap.py`。
 
 **超出官方 7 项的补充**（Aspire 是持牌金融机构，PII 是硬要求，手册未单列）：
 need-to-know 最小知情（进 LLM **之前**掩码多类标识，靠 Luhn / mod-97 校验而非长度猜测）·

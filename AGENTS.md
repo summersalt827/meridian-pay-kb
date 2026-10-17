@@ -42,4 +42,5 @@
 - relevance = BM25 分 / 查询自匹配上界（跨查询可比，0.17 由 27 组样本标定）
 - `auth.py`：PBKDF2-HMAC-SHA256 口令 + HMAC 签名令牌 + jti 吊销（角色变更即作废）
 - `web_ui.py`：Bearer 令牌鉴权 + 限流（`KB_RATE_LIMIT`/`KB_LOGIN_RATE_LIMIT`，默认 60/10 每分钟）+ 审计/反馈 API
+- `ingest_adapters.py`：统一摄入契约的第二实现（Confluence REST v2 fixture 适配器）。经 `kb.build(ingestor=...)` 插槽接入；改动 fixture 后必跑 `python3 scripts/demo_ingestor_swap.py`（12 项自检，含 RBAC/相关性门对新源的行为断言）
 - 语料 8 篇：public 2（全员）/ internal 2（仅 admin）/ gtm 4（sales+admin：icp 含评分卡规则与不追清单、playbook 含异议表与跟进节奏、pricing、case-studies 含量化案例）
