@@ -13,4 +13,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping live instance (keeps Render free tier warm)
-        run: curl -fsS --max-time 30 https://meridian-pay-kb.onrender.com/api/health
+        run: curl -fsS --max-time 90 https://meridian-pay-kb.onrender.com/api/health
