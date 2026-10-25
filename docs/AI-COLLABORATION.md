@@ -49,6 +49,8 @@ High-res versions of this workflow (with per-session example annotations):
 - [docs/multi-agent-workflow-1920x1080.png](multi-agent-workflow-1920x1080.png) (16:9)
 - [docs/multi-agent-workflow-1080x1440.png](multi-agent-workflow-1080x1440.png) (portrait)
 
+Promo card set (cover + P1–P5 explainer cards + architecture & workflow cards, XHS-optimised, link-free): [docs/promo-cards/](promo-cards/)
+
 ## Proof checklist (Handbook §7)
 
 | Requirement | Status |
