@@ -45,6 +45,10 @@ flowchart TD
 - **Claude Code** owns correctness and convergence: nothing lands on `main` without the ten-suite gate; UI polish and documentation keep the single source of truth coherent.
 - **The owner** sits on every decision gate: positioning, corpus facts, scope cuts, and final submission — the agents propose, the human disposes.
 
+High-res versions of this workflow (with per-session example annotations):
+- [docs/multi-agent-workflow-1920x1080.png](multi-agent-workflow-1920x1080.png) (16:9)
+- [docs/multi-agent-workflow-1080x1440.png](multi-agent-workflow-1080x1440.png) (portrait)
+
 ## Proof checklist (Handbook §7)
 
 | Requirement | Status |
