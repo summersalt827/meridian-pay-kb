@@ -13,4 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping live instance (keeps Render free tier warm)
-        run: curl -fsS --max-time 90 https://meridian-pay-kb.onrender.com/api/health
+        run: |
+          for attempt in 1 2 3; do
+            if curl -fsS --max-time 90 https://meridian-pay-kb.onrender.com/api/health; then
+              echo "ping ok (attempt $attempt)"
+              exit 0
+            fi
+            echo "ping failed (attempt $attempt), retrying in 45s"
+            sleep 45
+          done
+          echo "ping failed after 3 attempts"
+          exit 1
