@@ -225,7 +225,7 @@ need-to-know 最小知情（进 LLM **之前**掩码多类标识，靠 Luhn / mo
 
 ### 30 秒体验路径（live demo）
 
-> 线上地址：**https://meridian-pay-kb.onrender.com**（13 分钟保活 ping 保持热机，热响应实测 0.37s，2026-10-17；本地体验用 `http://localhost:8000`）
+> 线上地址：**https://meridian-pay-kb.onrender.com**（UptimeRobot 5 分钟 ping 保持热机，热响应实测 0.34s，2026-10-25；本地体验用 `http://localhost:8000`）
 >
 > **赶时间就直接开 [`?demo=1`](https://meridian-pay-kb.onrender.com/?demo=1)**：顶部出现演示条，
 > 点「下一步」它会自己换账号、切工作流、提问——六步走完 RBAC 拦截、账户情报、客户在场披露门。
@@ -285,7 +285,7 @@ KB_AUTH_SECRET=$(openssl rand -hex 24) python3 web_ui.py
 
 `render.yaml` Blueprint 一键部署。Dashboard 补两个环境变量：`LLM_API_KEY`、`KB_AUTH_SECRET`
 （均为 sync: false，不入仓库）。已部署于 **https://meridian-pay-kb.onrender.com**
-（13 分钟保活 ping 保持热机，热响应实测 0.37s；不保活则 free 档空闲 15 分钟后休眠、首个请求约 21s 唤醒——均为 2026-10-17 实测）。
+（UptimeRobot 5 分钟 ping 保持热机，热响应实测 0.34s，2026-10-25；GitHub keepalive 13 分钟 ping 兜底。不保活则 free 档空闲 15 分钟后休眠、首个请求约 21s 唤醒——2026-10-17 实测）。
 
 演示账号只属于演示实例：线上实例以 `KB_LIVE_READONLY=1` 运行（admin 唯一写端点已禁用），正式部署设 `KB_DEMO_ACCOUNTS=0` 可整体禁用内置演示账号（登录一律 401，health 不再报告演示账号）。
 

@@ -188,7 +188,7 @@ Primary build tool is **WorkBuddy (Tencent Cloud)**: the 9/26 foundation run pro
 
 ### 30-second experience path (live demo)
 
-> Live: **https://meridian-pay-kb.onrender.com** (kept warm by a 13-minute keep-alive ping — warm response measured 0.37s, 2026-10-17; local: `http://localhost:8000`)
+> Live: **https://meridian-pay-kb.onrender.com** (kept warm by a 5-minute UptimeRobot ping — warm response measured 0.34s, 2026-10-25; local: `http://localhost:8000`)
 >
 > **In a hurry, just open [`?demo=1`](https://meridian-pay-kb.onrender.com/?demo=1)**: a demo bar appears at the top; clicking "next" switches accounts, switches workflows and asks the questions itself — six steps covering RBAC interception, account intelligence and the customer-present disclosure gate. It only pre-fills the password and guides in order; **every step goes through the real `/api/login` + `/api/ask`**, so the `no_context` sales sees in that step is genuinely blocked server-side, not staged in the frontend (`test_web_matrix.py` D1–D5 pin this).
 
@@ -241,7 +241,7 @@ KB_AUTH_SECRET=$(openssl rand -hex 24) python3 web_ui.py
 
 ## Deploy (Render)
 
-`render.yaml` Blueprint, one-click. Fill two environment variables in the dashboard: `LLM_API_KEY`, `KB_AUTH_SECRET` (both `sync: false`, never in the repo). Deployed at **https://meridian-pay-kb.onrender.com** (Render free tier: warm response measured 0.37s; a scheduled keep-alive pings every 13 minutes — `.github/workflows/keepalive.yml` — because without it the instance spins down after 15 minutes idle and the first request wakes it in ~21s; both measured 2026-10-17).
+`render.yaml` Blueprint, one-click. Fill two environment variables in the dashboard: `LLM_API_KEY`, `KB_AUTH_SECRET` (both `sync: false`, never in the repo). Deployed at **https://meridian-pay-kb.onrender.com** (Render free tier: kept warm by an external UptimeRobot monitor pinging every 5 minutes — warm response measured 0.34s, 2026-10-25; `.github/workflows/keepalive.yml` pings every 13 minutes as backup. Without pings the instance spins down after 15 minutes idle and the first request wakes it in ~21s, measured 2026-10-17).
 
 Demo accounts are for the demo instance only: the live instance runs with `KB_LIVE_READONLY=1` (the only admin write endpoint is disabled there), and a production deployment sets `KB_DEMO_ACCOUNTS=0` to disable the built-in demo accounts entirely (login returns 401; the health endpoint then reports no demo accounts).
 
