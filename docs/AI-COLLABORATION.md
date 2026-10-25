@@ -26,6 +26,25 @@ Each session ran as one full prompt in WorkBuddy's sandbox; its patches were bro
 
 **Test growth across the build:** 9 tests at the foundation run (9/26) → 337 assertions across ten suites incl. the 26-check red team suite, 8 fintech-role matrix cases, 5 data-freshness (resync) cases, the audit hash-chain suite (append-only triggers + SHA-256 tamper detection), the disclosure-gate suite (customer-present mode: external-context zero leak + zero miss) and the shield suite (need-to-know masking + prompt-injection scan + answer re-check, with paired assertions proving precision), the GTM scorecard suite (deterministic scoring: reproducible tier mapping, red-line precedence, missing-fact handling) and the GTM outreach suite (deterministic first-touch email: slot filling by tier/industry/strongest signal, red line produces no copy at all, no invented numbers) (10/15). CI runs all ten suites on every push.
 
+## How the two agents divided the work
+
+```mermaid
+flowchart TD
+  H["👤 Owner — positioning, corpus facts, every decision gate"]
+  WB["🟣 WorkBuddy (Tencent Cloud) — primary build tool<br/>1 foundation run + sessions ①–⑤<br/>core engine · web UI · auth · gate calibration · GTM corpus · account-intelligence agent"]
+  SB["Sandbox: every suite green in isolation"]
+  EXP["Export as git bundle / patch"]
+  CC["🟠 Claude Code — merge + verify + polish<br/>merge patches · run 10 suites (337 assertions) as the gate · UI polish · README/docs · CI wiring"]
+  CI["CI on every push: ten suites, 337 assertions"]
+  DEP["Render deploy: live demo"]
+  H --> WB --> SB --> EXP --> CC --> CI --> DEP
+  CC -. "red-team findings / review feedback → next session prompt" .-> H
+```
+
+- **WorkBuddy** owns breadth and velocity: each session is one full prompt that builds a whole subsystem in its sandbox; the session prompt (persisted in `docs/build-sessions/`) doubles as the design document.
+- **Claude Code** owns correctness and convergence: nothing lands on `main` without the ten-suite gate; UI polish and documentation keep the single source of truth coherent.
+- **The owner** sits on every decision gate: positioning, corpus facts, scope cuts, and final submission — the agents propose, the human disposes.
+
 ## Proof checklist (Handbook §7)
 
 | Requirement | Status |
